@@ -1140,6 +1140,7 @@ async function loadBody(B, buf) {
   const c = (bodyCache[B.id] = { status: "loading" });
   try {
     if (!buf) buf = await modelStore.get(B.id);
+    if (!buf && B.src) buf = await fetchModel(B.src, B.alt);
     if (!buf) { c.status = "missing"; return c; }
     const { scene, animations } = await parseModel(buf, B.file);
     Object.assign(c, { status: "ok", scene, animations, info: analyzeModel(scene) });
@@ -1149,8 +1150,11 @@ async function loadBody(B, buf) {
 async function importBodyFile(file) {
   if (!look3d.ok) { toast("โหลดระบบ 3D ไม่สำเร็จ"); return; }
   if (!/\.(glb|gltf|vrm|fbx)$/i.test(file.name)) { toast("รองรับไฟล์ .glb .gltf .vrm .fbx"); return; }
-  const buf = await file.arrayBuffer(); const id = newId("body", S.bodies);
-  const B = { id, name: file.name.replace(/\.[^.]+$/, ""), file: file.name, size: file.size, yaw: 0, boneMap: {}, matSlots: {}, hairMode: "model", toon: false, attach: { head: 1, headY: 0, prop: 1 } };
+  await importBodyBuffer(await file.arrayBuffer(), file.name, file.size);
+}
+async function importBodyBuffer(buf, fileName, size, extra = {}) {
+  const id = newId("body", S.bodies), file = { name: fileName, size };
+  const B = { id, name: extra.name || file.name.replace(/\.[^.]+$/, ""), file: file.name, size: file.size, src: extra.src, alt: extra.alt, yaw: 0, boneMap: {}, matSlots: {}, hairMode: "model", toon: false, attach: { head: 1, headY: 0, prop: 1 } };
   toast("กำลังอ่าน " + file.name + " …");
   const c = await loadBody(B, buf);
   if (c.status !== "ok") { toast("เปิดไฟล์ไม่สำเร็จ: " + (c.error || "")); delete bodyCache[id]; return; }
@@ -1166,6 +1170,24 @@ async function importBodyFile(file) {
   save(); render();
 }
 
+// The sample base body ships next to the page, so the studio shows the team's model without importing it first.
+// .glb in the repo; base64 text where the host only serves text types.
+const SAMPLE_BODY = { src: "models/teen-base.glb", alt: "models/teen-base.glb.b64.txt", file: "teen-base.glb", name: "ร่างพื้นฐาน teen" };
+async function fetchModel(src, alt) {
+  try { const r = await fetch(src); if (r.ok) return await r.arrayBuffer(); } catch (e) {}
+  if (!alt) return null;
+  try { const r = await fetch(alt); if (!r.ok) return null; const t = atob((await r.text()).trim()), u = new Uint8Array(t.length); for (let i = 0; i < t.length; i++) u[i] = t.charCodeAt(i); return u.buffer; } catch (e) { return null; }
+}
+let sampleLoading = false;
+async function loadSampleBody(manual) {
+  if (!look3d.ok || sampleLoading) return; sampleLoading = true;
+  try {
+    const buf = await fetchModel(SAMPLE_BODY.src, SAMPLE_BODY.alt); if (!buf) throw new Error("missing");
+    S.sampleBodyDone = true;
+    await importBodyBuffer(buf, SAMPLE_BODY.file, buf.byteLength, { name: SAMPLE_BODY.name, src: SAMPLE_BODY.src, alt: SAMPLE_BODY.alt });
+  } catch (e) { if (manual) toast("โหลดโมเดลตัวอย่างไม่ได้ (ต้องเปิดหน้านี้ผ่านเว็บ ไม่ใช่เปิดไฟล์ในเครื่อง)"); }
+  sampleLoading = false;
+}
 async function reimportBody(id, file) {
   const B = byId(S.bodies, id); if (!B) return; const buf = await file.arrayBuffer(); B.file = file.name; B.size = file.size;
   const c = await loadBody(B, buf); if (c.status !== "ok") { toast("เปิดไฟล์ไม่สำเร็จ: " + (c.error || "")); render(); return; }
@@ -1303,7 +1325,7 @@ function secBody() {
   const left = `<div>${S.bodies.length ? listHTML("body", S.bodies.map((b) => ({ ...b })), (b) => { const c = bodyCache[b.id]; return !c || c.status === "loading" ? "กำลังโหลด…" : c.status === "ok" ? `กระดูก ${c.info.bones.length}` : c.status === "missing" ? "ไม่มีไฟล์ในเครื่องนี้" : "เปิดไม่ได้"; }) : ""}${drop}</div>`;
   const intro = head("ร่างพื้นฐาน 3D", "นำเข้าโมเดลที่ใส่กระดูก (rig) แล้วมาเป็นร่างกลางของ NPC ทุกตัว ระบบจับคู่กระดูกกับชื่อมาตรฐาน Humanoid ของ Godot ให้เอง แล้วใช้ท่าเดิน/ทำงาน/ยืนชุดเดียวกัน ผม หมวก และของถือจากหน้า \"รูปลักษณ์ตัวละคร\" จะติดไปกับกระดูกหัวและมือ ส่วนสีผิว ผม และชุดเปลี่ยนตามวัสดุของโมเดล");
   if (!look3d.ok) return intro + '<p class="muted">โหลดระบบ 3D ไม่สำเร็จ ลองรีเฟรชหน้า</p>';
-  if (!B) return intro + `<div class="work two"><div>${drop}<p class="note">ไฟล์โมเดลเก็บไว้ในเบราว์เซอร์นี้เท่านั้น ไม่ถูกส่งไปที่อื่น</p></div><div class="card"><h2>ยังไม่มีร่างพื้นฐาน</h2><p class="note">ระหว่างนี้ตัวละครใช้ร่างหัวโตชั่วคราว พอนำเข้าโมเดลแรก NPC ทุกตัวจะเปลี่ยนมาใช้ร่างนั้น</p><ul class="note"><li>ส่งออกจาก Blender เป็น glTF Binary (.glb) ใส่ Armature ไปด้วย</li><li>หันหน้าไปทาง +Z (ด้านหน้าของ Blender คือ -Y) ถ้าหันผิดปรับในหน้านี้ได้</li><li>ท่าเริ่มต้นเป็น T-pose หรือ A-pose ก็ได้</li></ul></div></div>`;
+  if (!B) return intro + `<div class="work two"><div>${drop}<p class="note">ไฟล์โมเดลเก็บไว้ในเบราว์เซอร์นี้เท่านั้น ไม่ถูกส่งไปที่อื่น</p></div><div class="card"><h2>ยังไม่มีร่างพื้นฐาน</h2><p class="note">ระหว่างนี้ตัวละครใช้ร่างหัวโตชั่วคราว พอนำเข้าโมเดลแรก NPC ทุกตัวจะเปลี่ยนมาใช้ร่างนั้น</p><ul class="note"><li>ส่งออกจาก Blender เป็น glTF Binary (.glb) ใส่ Armature ไปด้วย</li><li>หันหน้าไปทาง +Z (ด้านหน้าของ Blender คือ -Y) ถ้าหันผิดปรับในหน้านี้ได้</li><li>ท่าเริ่มต้นเป็น T-pose หรือ A-pose ก็ได้</li></ul><div class="row-actions"><button type="button" class="btn" data-act="body-sample">ใช้โมเดลตัวอย่างของทีม</button></div></div></div>`;
   const c = bodyCache[B.id] || { status: "loading" };
   let mid;
   if (c.status === "loading") mid = `<div class="card"><h2>${esc(B.name)}</h2><p class="muted">กำลังโหลด…</p></div>`;
@@ -1484,6 +1506,7 @@ main.addEventListener("click", (e) => {
   const l3 = e.target.closest("[data-look3d]"); if (l3) { const s3 = l3.dataset.look3d, ci = s3.indexOf(":"); look3d[s3.slice(0, ci)] = s3.slice(ci + 1); render(); return; }
   const by = e.target.closest("[data-body-yaw]"); if (by) { const B = byId(S.bodies, ui.sel.body); if (B) { B.yaw = Number(by.dataset.bodyYaw); save(); render(); } return; }
   const b = e.target.closest("[data-act]"); if (!b) return; const act = b.dataset.act;
+  if (act === "body-sample") { loadSampleBody(true); return; }
   if (act === "body-all" || act === "body-del" || act === "body-automap") {
     const B = byId(S.bodies, ui.sel.body); if (!B) return;
     if (act === "body-del" && !b.dataset.armed) { b.dataset.armed = "1"; b.textContent = "กดอีกครั้งเพื่อลบ"; setTimeout(() => { if (b.isConnected) { delete b.dataset.armed; b.textContent = "ลบร่างนี้"; } }, 3000); return; }
@@ -1537,13 +1560,13 @@ $("#copy-json").addEventListener("click", () => {
 });
 const resetBtn = $("#reset-btn");
 resetBtn.addEventListener("click", () => {
-  if (resetBtn.dataset.armed) { S = clone(DEFAULT); ensureLooks(); try { localStorage.removeItem(KEY); } catch (e) {} delete resetBtn.dataset.armed; resetBtn.textContent = "คืนค่าตัวอย่าง"; ui.simResult = null; toast("คืนค่าตัวอย่างแล้ว"); render(); return; }
+  if (resetBtn.dataset.armed) { S = clone(DEFAULT); ensureLooks(); try { localStorage.removeItem(KEY); } catch (e) {} delete resetBtn.dataset.armed; resetBtn.textContent = "คืนค่าตัวอย่าง"; ui.simResult = null; toast("คืนค่าตัวอย่างแล้ว"); render(); loadSampleBody(); return; }
   resetBtn.dataset.armed = "1"; resetBtn.textContent = "กดอีกครั้งเพื่อยืนยัน"; setTimeout(() => { delete resetBtn.dataset.armed; resetBtn.textContent = "คืนค่าตัวอย่าง"; }, 3000);
 });
 window.addEventListener("resize", () => { drawMap(); goodPreview(); simOut(); });
 
 const start = (location.hash || "").slice(1); if (SEC_FN[start]) ui.sec = start;
-render(); if (S.bodies.length) bootBodies();
+render(); if (S.bodies.length) bootBodies(); else if (!S.sampleBodyDone) loadSampleBody();
 })();
 </script>
 </body>
