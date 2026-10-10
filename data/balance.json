@@ -1,0 +1,86 @@
+{
+  "_about": "ค่าตั้งต้นสำหรับต้นแบบ (แหล่งเดียวของตัวเลข) — แก้ที่ไฟล์นี้แล้วรัน python3 tools/gen_balance_doc.py เพื่ออัปเดต docs/BALANCE.md ห้ามแก้ BALANCE.md ด้วยมือ",
+  "time": {
+    "_title": "เวลาและการจำลอง",
+    "periods_per_day": {"value": 4, "unit": "ช่วง/วัน", "note": "เช้า กลางวัน เย็น กลางคืน; 1 tick = 1 ช่วง", "source": "GDD เจาะลึก 4.2"},
+    "days_per_season": {"value": 28, "unit": "วัน", "note": "ใช้กับฤดูกาลและช่วงพักฟื้นหลังวิกฤต", "source": "ใหม่ — ต้องทดสอบ"},
+    "speed_normal_seconds_per_period": {"value": 3.0, "unit": "วินาทีจริง/ช่วง", "note": "ความเร็วปกติ", "source": "ใหม่ — ต้องทดสอบ"},
+    "speed_fast_multiplier": {"value": 4, "unit": "เท่า", "note": "ความเร็ว 'เร็ว'", "source": "ใหม่ — ต้องทดสอบ"},
+    "speed_very_fast_multiplier": {"value": 12, "unit": "เท่า", "note": "ความเร็ว 'เร็วมาก'", "source": "ใหม่ — ต้องทดสอบ"},
+    "pause_on_important_event": {"value": true, "unit": "", "note": "ค่าเริ่มต้น: หยุดเวลาเมื่อมีเหตุการณ์สำคัญ", "source": "GDD เจาะลึก 12.4"}
+  },
+  "influence": {
+    "_title": "อิทธิพลของกลุ่มดาว",
+    "cap": {"value": 100, "unit": "แต้ม", "note": "ส่วนเกินเพดานสูญไป", "source": "GDD เจาะลึก 9.2 / ภาคผนวกอิทธิพล 3.1"},
+    "start": {"value": 60, "unit": "แต้ม", "note": "แต้มเริ่มแคมเปญ", "source": "ภาคผนวกอิทธิพล 3.1"},
+    "regen_per_day": {"value": 10, "unit": "แต้ม/วันเกม", "note": "ฟื้นต่อเนื่องตามเวลาเกม (ไม่ใช่เวลาจริง)", "source": "GDD เจาะลึก 9.2 (DECISIONS D3)"},
+    "story_bonus_enabled": {"value": false, "unit": "", "note": "MVP ไม่มีโบนัสแต้มจากเหตุการณ์ ใช้การฟื้นพื้นฐานอย่างเดียว", "source": "ภาคผนวกอิทธิพล 3.4"},
+    "max_per_event": {"value": 30, "unit": "แต้ม", "note": "แต้มที่ใส่ในเหตุการณ์เดียวได้สูงสุด", "source": "ภาคผนวกอิทธิพล 5.4"},
+    "diminishing_full_points": {"value": 15, "unit": "แต้ม", "note": "แต้มแรกในเหตุการณ์นับเต็ม", "source": "ภาคผนวกอิทธิพล 6.2"},
+    "diminishing_half_points": {"value": 15, "unit": "แต้ม", "note": "แต้มถัดไปนับครึ่ง", "source": "ภาคผนวกอิทธิพล 6.2"},
+    "support_to_chance_ratio": {"value": 0.25, "unit": "จุด%/แต้มประสิทธิผล", "note": "แปลงแต้มสนับสนุนเป็นโอกาสสำเร็จ", "source": "ภาคผนวกอิทธิพล 6.4"},
+    "chance_bonus_cap": {"value": 15, "unit": "จุด%", "note": "โบนัสโอกาสรวมสูงสุดต่อเหตุการณ์", "source": "ภาคผนวกอิทธิพล 6.4"},
+    "damage_reduction_cap": {"value": 20, "unit": "%", "note": "ลดความเสียหายรวมสูงสุดต่อเหตุการณ์", "source": "ภาคผนวกอิทธิพล 6.5"}
+  },
+  "powers": {
+    "_title": "พลังกลุ่มดาว (คูลดาวน์แปลงจากภาคผนวก: 24 ชม.จริง = 1 วันเกม = 4 ช่วง)",
+    "watch": {"value": {"cost": 0, "cooldown_periods": 0, "mvp": true}, "unit": "", "note": "จับตามอง NPC หลัก 1 คน เปลี่ยนได้อิสระในโหมดเล่นคนเดียว", "source": "ภาคผนวกอิทธิพล 8.1 (DECISIONS D3)"},
+    "foresee": {"value": {"cost": 8, "cooldown_periods": 1, "mvp": true}, "unit": "", "note": "พยากรณ์: แสดงช่วงความเสี่ยงและความเชื่อมั่น", "source": "ภาคผนวกอิทธิพล 8.2"},
+    "omen": {"value": {"cost": 12, "cooldown_periods": 1, "mvp": true}, "unit": "", "note": "ส่งลาง: เปิดเผยเบาะแสที่มีอยู่ ไม่หักแต้มถ้าไม่มีลางให้ส่ง", "source": "ภาคผนวกอิทธิพล 8.3"},
+    "blessing": {"value": {"cost": 25, "cooldown_periods": 2, "mvp": true, "chance_bonus_pp": 6}, "unit": "", "note": "ประทานพร: +5–8 จุด% (ใช้ 6) ภายใต้เพดานรวม", "source": "ภาคผนวกอิทธิพล 8.4"},
+    "gift": {"value": {"cost": 30, "cooldown_periods": 4, "mvp": true}, "unit": "", "note": "ของขวัญจากฟ้า: ของพื้นฐาน 1 ชุด ขายต่อไม่ได้", "source": "ภาคผนวกอิทธิพล 8.5"},
+    "protect": {"value": {"cost": 35, "cooldown_periods": 4, "mvp": false}, "unit": "", "note": "พิทักษ์: หลัง MVP", "source": "ภาคผนวกอิทธิพล 8.6"},
+    "crisis_intervention": {"value": {"cost": 50, "cooldown_periods": 12, "mvp": false}, "unit": "", "note": "แทรกแซงวิกฤต: เปลี่ยนตายเป็นบาดเจ็บวิกฤต 1 ครั้ง/บท — หลัง MVP", "source": "ภาคผนวกอิทธิพล 8.7"}
+  },
+  "npc": {
+    "_title": "NPC: ความต้องการ ความทรงจำ ความสัมพันธ์",
+    "need_urgent_on": {"value": 75, "unit": "0–100", "note": "ความต้องการเกินค่านี้ = เร่งด่วน (hysteresis เปิด)", "source": "GDD เจาะลึก 5.2 (DECISIONS D9)"},
+    "need_urgent_off": {"value": 35, "unit": "0–100", "note": "ลดต่ำกว่าค่านี้ = หายเร่งด่วน (hysteresis ปิด)", "source": "GDD เจาะลึก 5.2 (DECISIONS D9)"},
+    "memory_max_per_npc": {"value": 25, "unit": "รายการ", "note": "ความทรงจำเด่นของ NPC สำคัญ (เอกสารให้ 20–30)", "source": "GDD เจาะลึก 5.7"},
+    "relationship_max_per_npc": {"value": 30, "unit": "เส้น", "note": "เส้นความสัมพันธ์ละเอียดต่อคน (เอกสารให้ 20–40)", "source": "ภาคผนวกสังคม 13"},
+    "decision_softmax_temperature": {"value": 0.15, "unit": "", "note": "ความแปรผันตอนเลือก action ที่คะแนนใกล้กัน", "source": "ใหม่ — ต้องทดสอบ"}
+  },
+  "party_combat": {
+    "_title": "ปาร์ตี้และการต่อสู้",
+    "party_size_min": {"value": 2, "unit": "คน", "note": "", "source": "GDD เจาะลึก 7.1"},
+    "party_size_max": {"value": 4, "unit": "คน", "note": "", "source": "GDD เจาะลึก 7.1"},
+    "power_weight_combat_skill": {"value": 0.45, "unit": "", "note": "party_power = Σ(combat×0.45 + equipment×0.35 + health_ratio×20 + synergy×0.20)", "source": "GDD เจาะลึก 8.3"},
+    "power_weight_equipment": {"value": 0.35, "unit": "", "note": "", "source": "GDD เจาะลึก 8.3"},
+    "power_weight_health_ratio": {"value": 20, "unit": "", "note": "", "source": "GDD เจาะลึก 8.3"},
+    "power_weight_role_synergy": {"value": 0.20, "unit": "", "note": "", "source": "GDD เจาะลึก 8.3"},
+    "risk_ratio_low_below": {"value": 0.6, "unit": "risk_ratio", "note": "ต่ำกว่านี้ = เสี่ยงต่ำ", "source": "ใหม่ — ต้องทดสอบ"},
+    "risk_ratio_medium_below": {"value": 1.0, "unit": "risk_ratio", "note": "ต่ำกว่านี้ = ปานกลาง", "source": "ใหม่ — ต้องทดสอบ"},
+    "risk_ratio_high_below": {"value": 1.5, "unit": "risk_ratio", "note": "ต่ำกว่านี้ = สูง; ตั้งแต่ค่านี้ขึ้นไป = วิกฤต", "source": "ใหม่ — ต้องทดสอบ"}
+  },
+  "economy": {
+    "_title": "เศรษฐกิจแบบย่อระดับชุมชน (DECISIONS D6)",
+    "goods": {"value": ["food", "medicine", "materials", "equipment"], "unit": "", "note": "สต็อกต่อชุมชน 4 หมวด + เงินของ NPC สำคัญ", "source": "GDD หลัก 8 / GDD เจาะลึก 6.2"},
+    "target_stock_days": {"value": 7, "unit": "วัน", "note": "สต็อกเป้าหมายใช้คำนวณราคา", "source": "ภาคผนวกเศรษฐกิจ 7.2"},
+    "food_reserve_days": {"value": 4, "unit": "วัน", "note": "อาหารสำรองชุมชน (เอกสารให้ 3–5)", "source": "ภาคผนวกเศรษฐกิจ 15.1"},
+    "price_exponent": {"value": 0.25, "unit": "", "note": "raw = base × (target/stock)^0.25", "source": "ภาคผนวกเศรษฐกิจ 7.2"},
+    "price_index_min": {"value": 0.6, "unit": "เท่าของฐาน", "note": "", "source": "ภาคผนวกเศรษฐกิจ 7.2"},
+    "price_index_max": {"value": 1.8, "unit": "เท่าของฐาน", "note": "", "source": "ภาคผนวกเศรษฐกิจ 7.2"},
+    "price_daily_change_max": {"value": 0.10, "unit": "สัดส่วน/วัน", "note": "ราคาขยับไม่เกิน ±10% ต่อวัน", "source": "ภาคผนวกเศรษฐกิจ 7.2"},
+    "shop_buy_ratio": {"value": 0.90, "unit": "เท่าของราคาอ้างอิง", "note": "ร้านรับซื้อ (เอกสารให้ 0.85–0.95)", "source": "ภาคผนวกเศรษฐกิจ 7.1"},
+    "shop_sell_ratio": {"value": 1.10, "unit": "เท่าของราคาอ้างอิง", "note": "ร้านขาย (เอกสารให้ 1.00–1.15)", "source": "ภาคผนวกเศรษฐกิจ 7.1"},
+    "constellation_production_bonus_cap": {"value": 0.10, "unit": "สัดส่วน/กิจการ/วัน", "note": "", "source": "ภาคผนวกเศรษฐกิจ 13"}
+  },
+  "chronicle": {
+    "_title": "พงศาวดาร (template อย่างเดียวใน MVP)",
+    "importance_timeline": {"value": 25, "unit": "คะแนน", "note": "≥ ค่านี้ เก็บใน timeline บุคคล/พื้นที่", "source": "ภาคผนวก Chronicle 4.3"},
+    "importance_notable": {"value": 50, "unit": "คะแนน", "note": "≥ ค่านี้ เป็น Notable Event", "source": "ภาคผนวก Chronicle 4.3"},
+    "importance_chronicle": {"value": 75, "unit": "คะแนน", "note": "≥ ค่านี้ เข้าพงศาวดารหลัก", "source": "ภาคผนวก Chronicle 4.3"},
+    "importance_era": {"value": 90, "unit": "คะแนน", "note": "≥ ค่านี้ เป็นหมุดหมายยุค ห้ามยุบรวม", "source": "ภาคผนวก Chronicle 4.3"},
+    "daily_digest_items": {"value": 5, "unit": "รายการ", "note": "สรุปรายวัน 3–5 รายการ", "source": "ภาคผนวก Chronicle 9.1"}
+  },
+  "world_mvp": {
+    "_title": "ขอบเขตโลก MVP",
+    "nodes": {"value": 5, "unit": "โหนด", "note": "ลูเมน อัสเทรา ป่ารากเงิน เหมืองร้าง หอคอยจันทรา", "source": "GDD เจาะลึก 4.1 / 15.1"},
+    "routes_max": {"value": 7, "unit": "เส้น", "note": "", "source": "GDD เจาะลึก 15.1"},
+    "key_npcs": {"value": 12, "unit": "คน", "note": "", "source": "GDD เจาะลึก 15.1"},
+    "monster_types": {"value": 3, "unit": "ประเภท", "note": "+ บอส 1", "source": "GDD เจาะลึก 15.1"},
+    "quest_types": {"value": 5, "unit": "ประเภท", "note": "", "source": "GDD เจาะลึก 15.1"},
+    "chapter_crises": {"value": 1, "unit": "วิกฤต/บท", "note": "ผลลัพธ์อย่างน้อย 3 แนวทาง", "source": "GDD เจาะลึก 10.3 / 15.1"},
+    "stability_test_days": {"value": 30, "unit": "วันเกม", "note": "โลกต้องเดินได้โดยไม่มีค่าหลุดขอบหรือวงจรค้าง", "source": "GDD เจาะลึก 16"}
+  }
+}
