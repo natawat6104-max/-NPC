@@ -1,5 +1,6 @@
 # เอกสารออกแบบ — พงศาวดารใต้ดวงดาว
 
+- [`HANDOFF.md`](HANDOFF.md) — สรุปงานทั้งหมดและงานค้าง สำหรับส่งต่อให้ Claude Code เครื่องอื่น
 - [`DECISIONS.md`](DECISIONS.md) — การตัดสินใจที่ใช้ตัดสินเมื่อเอกสารขัดกัน **อ่านก่อน**
 - [`GODOT-IMPORT.md`](GODOT-IMPORT.md) — นำร่างตัวละครเข้า Godot (ขนาด texture, จับคู่กระดูก)
 - [`BALANCE.md`](BALANCE.md) — ตารางตัวเลขกลาง (สร้างจาก `data/balance.json`)
