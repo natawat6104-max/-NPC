@@ -66,6 +66,22 @@ main { overflow-y: auto; padding: 18px 20px 40px; min-width: 0; }
 .head p { margin: 0; color: var(--muted); flex-basis: 100%; max-width: 70ch; }
 .work { display: grid; grid-template-columns: 210px minmax(0, 1fr) minmax(0, 360px); gap: 16px; align-items: start; }
 .work.two { grid-template-columns: minmax(0, 1fr) minmax(0, 380px); }
+.work.lookw { grid-template-columns: 190px minmax(0, 0.9fr) minmax(0, 1.1fr); }
+.stagewrap { position: relative; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); }
+canvas.stage3d { display: block; width: 100%; height: clamp(300px, 46vh, 460px); touch-action: pan-y; cursor: grab; }
+.look-labels { position: absolute; inset: 0; pointer-events: none; }
+.look-labels span { position: absolute; left: 0; top: 0; font-size: 11px; font-weight: 600; padding: 0 7px; border-radius: 999px; background: rgba(11,16,36,0.78); color: var(--text); white-space: nowrap; }
+.look-labels span.sel { background: var(--gold); color: var(--gold-ink); }
+.seg { display: inline-flex; gap: 0; }
+.seg .btn { border-radius: 0; } .seg .btn:first-child { border-radius: 8px 0 0 8px; } .seg .btn:last-child { border-radius: 0 8px 8px 0; } .seg .btn + .btn { border-left: 0; }
+.swatches { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.sw { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--line); padding: 0; }
+.sw.on { border-color: var(--gold); box-shadow: 0 0 0 2px var(--gold); }
+.swatches input[type=color] { width: 40px; height: 28px; padding: 0 2px; }
+input[type=color] { min-height: 30px; padding: 2px; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; }
+input[type=color]:disabled { opacity: 0.6; cursor: not-allowed; }
+.work > * { min-width: 0; }
+.tablewrap select { min-width: 96px; }
 .list { display: flex; flex-direction: column; gap: 4px; }
 .list .item { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; border: 1px solid transparent; background: transparent; border-radius: 8px; padding: 6px 10px; }
 .list .item:hover { background: var(--surface); }
@@ -141,14 +157,14 @@ canvas.chart { width: 100%; height: 170px; display: block; }
 .drawer pre { margin: 0; overflow: auto; background: var(--bg); border-radius: 8px; padding: 10px; font-family: var(--font-mono); font-size: 0.78rem; flex: 1; min-height: 0; }
 .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--gold); color: var(--gold-ink); padding: 6px 14px; border-radius: 999px; font-weight: 600; z-index: 20; }
 
-@media (max-width: 1100px) { .work { grid-template-columns: 190px minmax(0, 1fr); } .work > .preview { grid-column: 1 / -1; } }
+@media (max-width: 1100px) { .work, .work.lookw { grid-template-columns: 190px minmax(0, 1fr); } .work > .preview { grid-column: 1 / -1; } }
 @media (max-width: 760px) {
   .body { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
   nav.side { flex-direction: row; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--line); padding: 6px 12px; }
   nav.side .grp { display: none; }
   nav.side button { width: auto; white-space: nowrap; }
   main { padding: 14px 16px 40px; }
-  .work, .work.two { grid-template-columns: 1fr; }
+  .work, .work.two, .work.lookw { grid-template-columns: 1fr; }
   .list { flex-direction: row; overflow-x: auto; }
   .list .item { width: auto; white-space: nowrap; }
   .fields { grid-template-columns: 1fr; }
@@ -183,6 +199,7 @@ canvas.chart { width: 100%; height: 170px; display: block; }
   <pre id="json-out"></pre>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 (() => {
 "use strict";
@@ -273,7 +290,7 @@ if (!S || !S.nodes) S = clone(DEFAULT);
 
 const ui = {
   sec: "overview",
-  sel: { npc: "rena", monster: "shadow_wolf", good: "medicine", quest: "gather", template: "party_returned", world: { kind: "node", id: "lumen" } },
+  sel: { look: "rena", npc: "rena", monster: "shadow_wolf", good: "medicine", quest: "gather", template: "party_returned", world: { kind: "node", id: "lumen" } },
   link: false, linkFrom: null, party: ["rena", "toma"],
   sc: { food: 1, info: 40, fatigue: 30, threat: 55 },
   stock: 9,
@@ -302,7 +319,7 @@ const EVENT_FIELDS = {
 const EVENT_NAMES = { party_returned: "ปาร์ตี้กลับจากภารกิจ", npc_injured: "NPC บาดเจ็บ", shortage_changed: "ระดับสต็อกเปลี่ยน", quest_posted: "มีภารกิจใหม่", omen_sent: "กลุ่มดาวส่งลาง" };
 const SECTIONS = [
   { grp: "โครงการ" }, { id: "overview", name: "ภาพรวม" },
-  { grp: "โลก" }, { id: "world", name: "แผนที่และเส้นทาง" }, { id: "npc", name: "ตัวละคร NPC" }, { id: "monster", name: "มอนสเตอร์" }, { id: "good", name: "สินค้าและราคา" },
+  { grp: "โลก" }, { id: "world", name: "แผนที่และเส้นทาง" }, { id: "npc", name: "ตัวละคร NPC" }, { id: "look", name: "รูปลักษณ์ตัวละคร" }, { id: "monster", name: "มอนสเตอร์" }, { id: "good", name: "สินค้าและราคา" },
   { grp: "เรื่องราว" }, { id: "quest", name: "แม่แบบภารกิจ" }, { id: "crisis", name: "วิกฤตประจำบท" }, { id: "template", name: "แม่แบบพงศาวดาร" },
   { grp: "ระบบ" }, { id: "power", name: "พลังกลุ่มดาว" }, { id: "balance", name: "ตัวเลข Balance" }, { id: "sim", name: "ทดสอบจำลอง" },
 ];
@@ -371,6 +388,7 @@ function issues() {
   for (const q of S.quests) if (!nodeIds.has(q.dest)) out.push({ sec: "quest", id: q.id, msg: `${q.name}: จุดหมายไม่มีในแผนที่` });
   if (S.crisis.outcomes.length < 3) out.push({ sec: "crisis", msg: `วิกฤตต้องมีผลลัพธ์อย่างน้อย 3 แนวทาง (ตอนนี้มี ${S.crisis.outcomes.length})` });
   for (const t of S.templates) { const allowed = EVENT_FIELDS[t.event] || {}; const bad = [...t.text.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).filter((k) => !(k in allowed)); if (bad.length) out.push({ sec: "template", id: t.id, msg: `แม่แบบ ${t.id}: ใช้ช่องที่เหตุการณ์นี้ไม่มี {${bad.join("}, {")}}` }); }
+  out.push(...lookIssues());
   if (!S.goods.some((g) => g.id === "medicine")) out.push({ sec: "good", msg: "ไม่มีสินค้า 'ยา' (medicine) ซึ่งวิกฤตและระบบจำลองต้องใช้" });
   return out;
 }
@@ -378,7 +396,7 @@ function issues() {
 // ======================= nav + top =======================
 function renderNav() {
   const iss = issues(); const counts = {
-    world: `${S.nodes.length}·${S.routes.length}`, npc: S.npcs.length, monster: S.monsters.length, good: S.goods.length, quest: S.quests.length, crisis: S.crisis.outcomes.length + " ผล", template: S.templates.length, power: Object.keys(S.balance.powers).length,
+    world: `${S.nodes.length}·${S.routes.length}`, npc: S.npcs.length, look: S.npcs.length, monster: S.monsters.length, good: S.goods.length, quest: S.quests.length, crisis: S.crisis.outcomes.length + " ผล", template: S.templates.length, power: Object.keys(S.balance.powers).length,
   };
   $("#nav").innerHTML = SECTIONS.map((s) => {
     if (s.grp) return `<div class="grp">${s.grp}</div>`;
@@ -806,8 +824,219 @@ function chart(cv, o) {
 }
 
 // ======================= render + events =======================
-const SEC_FN = { overview: secOverview, world: secWorld, npc: secNPC, monster: secMonster, good: secGood, quest: secQuest, crisis: secCrisis, template: secTemplate, power: secPower, balance: secBalance, sim: secSim };
-function derived() { npcPreview(); monPreview(); goodPreview(); questPreview(); tplPreview(); powerPreview(); simOut(); drawMap(); renderNav(); }
+// ======================= character appearance (chibi) =======================
+const HAIRS = { short: "สั้น", pony: "หางม้า", bun: "มวย", long: "ยาว", hood: "ฮู้ดคลุม", bald: "ไม่มีผม" };
+const OUTFITS = { tunic: "เสื้อคลุมสั้น", robe: "ชุดยาว", cloak: "เสื้อ + ผ้าคลุมหลัง", armor: "เกราะเบา" };
+const HATS = { none: "ไม่มี", straw: "หมวกฟาง", helmet: "หมวกเหล็ก", cap: "หมวกแก๊ป" };
+const PROPS = { none: "ไม่มี", pack: "เป้", bow: "ธนู", apron: "ผ้ากันเปื้อน", hammer: "ค้อน", hoe: "จอบ", bag: "กระเป๋าสะพาย", lantern: "ตะเกียง", spear: "หอก" };
+const SKIN_TONES = ["#f6d9bd", "#f0c7a0", "#e2b48c", "#d6a07a", "#c08560", "#8f5f42"];
+const HAIR_COLORS = ["#23232f", "#3a2a22", "#5b4630", "#8a3d1c", "#b8743a", "#d9b56b", "#e8e1d6", "#4b5a7a"];
+const DEFAULT_ROLE_PALETTE = {
+  "นักผจญภัย": { main: "#d27a3a", accent: "#6e4a2a", prop: "pack", hat: "none", outfit: "tunic" },
+  "นักธนู": { main: "#4f63b8", accent: "#2f3a6e", prop: "bow", hat: "none", outfit: "cloak" },
+  "ผู้รักษา": { main: "#3f9a7c", accent: "#f3efe2", prop: "apron", hat: "none", outfit: "robe" },
+  "ช่างตีเหล็ก": { main: "#8a5a3f", accent: "#3b3b44", prop: "hammer", hat: "none", outfit: "tunic" },
+  "พ่อค้า": { main: "#9c4f7a", accent: "#e3bf63", prop: "bag", hat: "cap", outfit: "robe" },
+  "ชาวนา": { main: "#a3a646", accent: "#6b4a2e", prop: "hoe", hat: "straw", outfit: "tunic" },
+  "ยามรักษาการณ์": { main: "#4a5a6e", accent: "#9aa5b8", prop: "lantern", hat: "helmet", outfit: "armor" },
+};
+const DEFAULT_LOOKS = {
+  rena: { hair: "pony", hairColor: "#8a3d1c", skin: "#f0c7a0", outfit: "tunic", hat: "none", prop: "pack", beard: false, height: 1, build: 1 },
+  toma: { hair: "hood", hairColor: "#23232f", skin: "#e2b48c", outfit: "cloak", hat: "none", prop: "bow", beard: false, height: 1.03, build: 0.95 },
+  mira: { hair: "bun", hairColor: "#3a2a22", skin: "#f6d9bd", outfit: "robe", hat: "none", prop: "apron", beard: false, height: 0.97, build: 1 },
+  bron: { hair: "short", hairColor: "#3a2a22", skin: "#d6a07a", outfit: "tunic", hat: "none", prop: "hammer", beard: true, height: 1.02, build: 1.18 },
+  darin: { hair: "long", hairColor: "#23232f", skin: "#e2b48c", outfit: "robe", hat: "cap", prop: "bag", beard: false, height: 1, build: 1.05 },
+  harl: { hair: "short", hairColor: "#5b4630", skin: "#c08560", outfit: "tunic", hat: "straw", prop: "hoe", beard: true, height: 1.06, build: 1.05 },
+  nella: { hair: "pony", hairColor: "#b8743a", skin: "#f0c7a0", outfit: "tunic", hat: "straw", prop: "hoe", beard: false, height: 0.96, build: 1 },
+  kel: { hair: "short", hairColor: "#23232f", skin: "#8f5f42", outfit: "armor", hat: "helmet", prop: "lantern", beard: false, height: 1.08, build: 1.08 },
+};
+function randomLook(role) {
+  const R = (S.rolePalette || DEFAULT_ROLE_PALETTE)[role] || DEFAULT_ROLE_PALETTE["ชาวนา"]; const pick = (a) => a[Math.floor(Math.random() * a.length)];
+  const hair = pick(["short", "short", "pony", "bun", "long", "bald"]);
+  return { hair, hairColor: pick(HAIR_COLORS), skin: pick(SKIN_TONES), outfit: R.outfit, hat: R.hat, prop: R.prop, beard: hair === "short" && Math.random() < 0.35, height: +(0.92 + Math.random() * 0.16).toFixed(2), build: +(0.9 + Math.random() * 0.22).toFixed(2), useRole: true, main: R.main, accent: R.accent };
+}
+function ensureLooks() {
+  if (!S.rolePalette) S.rolePalette = clone(DEFAULT_ROLE_PALETTE);
+  for (const r of ROLES) if (!S.rolePalette[r]) S.rolePalette[r] = clone(DEFAULT_ROLE_PALETTE[r]);
+  for (const n of S.npcs) if (!n.look) { const R = S.rolePalette[n.role] || {}; n.look = DEFAULT_LOOKS[n.id] ? { ...clone(DEFAULT_LOOKS[n.id]), useRole: true, main: R.main, accent: R.accent } : randomLook(n.role); }
+}
+function lookOf(n) { const L = n.look, R = S.rolePalette[n.role] || {}; return { ...L, main: L.useRole ? R.main || L.main : L.main, accent: L.useRole ? R.accent || L.accent : L.accent }; }
+const hexDist = (a, b) => { const p = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)); const x = p(a), y = p(b); return Math.hypot(x[0] - y[0], x[1] - y[1], x[2] - y[2]); };
+function lookIssues() {
+  const out = [];
+  for (let i = 0; i < S.npcs.length; i++) for (let j = i + 1; j < S.npcs.length; j++) {
+    const a = S.npcs[i], b = S.npcs[j]; if (!a.look || !b.look) continue; const A = lookOf(a), B = lookOf(b);
+    const hairHidden = (h) => h.hat === "helmet";
+    const sameHead = A.hat === B.hat && (hairHidden(A) || (A.hair === B.hair && hexDist(A.hairColor, B.hairColor) < 70));
+    if (sameHead && A.prop === B.prop && hexDist(A.main, B.main) < 50) out.push({ sec: "look", id: b.id, msg: `${a.name} กับ ${b.name} หน้าตาคล้ายกันมาก มองจากมุมเกมจะแยกไม่ออก ลองเปลี่ยนทรงผม หมวก หรือสีผม` });
+  }
+  return out;
+}
+ensureLooks();
+
+const look3d = { ok: !!window.THREE, rigs: {}, sig: {}, target: "one", view: "close", action: "walk", yaw: 0.6, drag: null };
+function initLook3d() {
+  if (!look3d.ok || look3d.renderer) return;
+  const canvas = document.createElement("canvas"); canvas.className = "stage3d"; canvas.setAttribute("aria-label", "ตัวอย่างตัวละคร 3D");
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true }); renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  const scene = new THREE.Scene(); scene.background = new THREE.Color(0x9fc3e6); scene.fog = new THREE.Fog(0x9fc3e6, 60, 160);
+  scene.add(new THREE.HemisphereLight(0xdfeaff, 0x5a6a46, 0.8));
+  const sun = new THREE.DirectionalLight(0xfff0d8, 0.8); sun.position.set(8, 18, 10); sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024);
+  Object.assign(sun.shadow.camera, { left: -16, right: 16, top: 16, bottom: -16, near: 1, far: 60 }); scene.add(sun);
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(300, 300), new THREE.MeshLambertMaterial({ color: 0x7fa356 })); ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+  const plaza = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.7, 0.12, 40), new THREE.MeshLambertMaterial({ color: 0xc2a676 })); plaza.position.y = 0.06; plaza.receiveShadow = true; scene.add(plaza);
+  for (const [x, z, r] of [[-7, -6, 0.3], [6.5, -7, -0.2], [11, 2, 0.6]]) {
+    const g = new THREE.Group(); const b = new THREE.Mesh(new THREE.BoxGeometry(2.6, 2.2, 2.2), new THREE.MeshLambertMaterial({ color: 0xd9c3a0 })); b.position.y = 1.1; b.castShadow = true; g.add(b);
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(2.3, 1.5, 4), new THREE.MeshLambertMaterial({ color: 0x7a3f32 })); roof.rotation.y = Math.PI / 4; roof.position.y = 2.95; roof.castShadow = true; g.add(roof);
+    g.position.set(x, 0, z); g.rotation.y = r; scene.add(g);
+  }
+  const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 400);
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.75, 0.95, 32), new THREE.MeshBasicMaterial({ color: 0xe3bf63, side: THREE.DoubleSide })); ring.rotation.x = -Math.PI / 2; ring.position.y = 0.14; scene.add(ring);
+  Object.assign(look3d, { canvas, renderer, scene, camera, plaza, ring, camPos: new THREE.Vector3(0, 4, 9), last: performance.now() });
+  canvas.addEventListener("pointerdown", (e) => { look3d.drag = e.clientX; canvas.setPointerCapture(e.pointerId); });
+  canvas.addEventListener("pointermove", (e) => { if (look3d.drag == null) return; look3d.yaw -= (e.clientX - look3d.drag) * 0.01; look3d.drag = e.clientX; });
+  canvas.addEventListener("pointerup", () => { look3d.drag = null; });
+  canvas.addEventListener("click", (e) => {
+    if (look3d.target !== "all") return; const r = canvas.getBoundingClientRect(); const v = new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+    const ray = new THREE.Raycaster(); ray.setFromCamera(v, camera); const hit = ray.intersectObjects(Object.values(look3d.rigs).map((x) => x.root), true)[0];
+    if (hit) { let o = hit.object; while (o && !o.userData.npc) o = o.parent; if (o) { ui.sel.look = o.userData.npc; render(); } }
+  });
+  requestAnimationFrame(lookFrame);
+}
+const toonCache = {};
+function toon(color) { return toonCache[color] || (toonCache[color] = new THREE.MeshToonMaterial({ color })); }
+function part(geo, color) { const m = new THREE.Mesh(geo, toon(color)); m.castShadow = true; return m; }
+function buildChibi(L) {
+  const root = new THREE.Group(), r = { root }; const pv = (x, y, z) => { const g = new THREE.Group(); g.position.set(x, y, z); return g; };
+  const robe = L.outfit === "robe";
+  r.legL = pv(-0.14, 0.42, 0); r.legR = pv(0.14, 0.42, 0);
+  for (const g of [r.legL, r.legR]) { const leg = part(new THREE.CylinderGeometry(0.11, 0.12, 0.42, 10), "#2a2433"); leg.position.y = -0.21; g.add(leg); const shoe = part(new THREE.SphereGeometry(0.13, 10, 8), "#5a3a28"); shoe.scale.set(1, 0.6, 1.3); shoe.position.set(0, -0.42, 0.03); g.add(shoe); root.add(g); }
+  r.torso = pv(0, 0.42, 0); root.add(r.torso);
+  const bodyColor = L.outfit === "armor" ? L.accent : L.main;
+  const body = part(robe ? new THREE.CylinderGeometry(0.25, 0.42, 0.8, 16) : new THREE.CylinderGeometry(0.26, 0.34, 0.5, 14), bodyColor); body.position.y = robe ? 0.1 : 0.25; r.torso.add(body);
+  const belt = part(new THREE.CylinderGeometry(robe ? 0.3 : 0.31, robe ? 0.3 : 0.31, 0.07, 14), L.outfit === "armor" ? L.main : L.accent); belt.position.y = robe ? 0.2 : 0.1; r.torso.add(belt);
+  if (L.outfit === "armor") for (const sx of [-0.3, 0.3]) { const pad = part(new THREE.SphereGeometry(0.15, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2), L.main); pad.position.set(sx, 0.46, 0); r.torso.add(pad); }
+  if (L.outfit === "cloak") { const cape = part(new THREE.BoxGeometry(0.62, 0.62, 0.05), L.accent); cape.position.set(0, 0.2, -0.32); cape.rotation.x = 0.15; r.torso.add(cape); }
+  r.head = pv(0, 0.5, 0); r.torso.add(r.head);
+  const head = part(new THREE.SphereGeometry(0.5, 20, 16), L.skin); head.position.y = 0.48; r.head.add(head);
+  for (const sx of [-0.17, 0.17]) {
+    const eye = part(new THREE.SphereGeometry(0.06, 10, 8), "#1d1a24"); eye.scale.set(0.8, 1.25, 0.5); eye.position.set(sx, 0.48, 0.46); r.head.add(eye);
+    const blush = part(new THREE.SphereGeometry(0.06, 10, 8), "#f2a0a0"); blush.scale.set(1.2, 0.6, 0.3); blush.position.set(sx * 1.45, 0.36, 0.42); r.head.add(blush);
+  }
+  if (L.beard) { const b = part(new THREE.SphereGeometry(0.28, 14, 10), L.hairColor); b.scale.set(1.1, 0.7, 0.8); b.position.set(0, 0.22, 0.25); r.head.add(b); }
+  if (L.hair !== "bald" && L.hair !== "hood") {
+    const cap = part(new THREE.SphereGeometry(0.53, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.55), L.hairColor); cap.position.y = 0.5; cap.rotation.x = -0.25; r.head.add(cap);
+    const bangs = part(new THREE.SphereGeometry(0.5, 16, 8, -Math.PI * 0.45, Math.PI * 0.9, 0, Math.PI * 0.33), L.hairColor); bangs.position.set(0, 0.55, 0.06); r.head.add(bangs);
+  }
+  if (L.hair === "pony") { const p = part(new THREE.SphereGeometry(0.2, 12, 10), L.hairColor); p.scale.set(0.8, 1.5, 0.8); p.position.set(0, 0.55, -0.55); r.head.add(p); }
+  if (L.hair === "bun") { const b = part(new THREE.SphereGeometry(0.2, 12, 10), L.hairColor); b.position.set(0, 1.02, -0.12); r.head.add(b); }
+  if (L.hair === "long") { const b = part(new THREE.SphereGeometry(0.5, 16, 12), L.hairColor); b.scale.set(1.02, 1.15, 0.6); b.position.set(0, 0.3, -0.2); r.head.add(b); }
+  if (L.hair === "hood") { const h = part(new THREE.SphereGeometry(0.58, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.6), L.accent); h.position.y = 0.46; h.rotation.x = -0.45; r.head.add(h); }
+  if (L.hat === "straw") { const brim = part(new THREE.CylinderGeometry(0.78, 0.78, 0.04, 24), "#d9b65c"); brim.position.y = 0.86; r.head.add(brim); const top = part(new THREE.CylinderGeometry(0.34, 0.4, 0.24, 18), "#d9b65c"); top.position.y = 1.0; r.head.add(top); }
+  if (L.hat === "helmet") { const h = part(new THREE.SphereGeometry(0.56, 18, 10, 0, Math.PI * 2, 0, Math.PI * 0.5), "#9aa0ac"); h.position.y = 0.52; r.head.add(h); const brim = part(new THREE.CylinderGeometry(0.6, 0.6, 0.05, 20), "#7d8390"); brim.position.y = 0.55; r.head.add(brim); }
+  if (L.hat === "cap") { const h = part(new THREE.SphereGeometry(0.54, 18, 10, 0, Math.PI * 2, 0, Math.PI * 0.42), L.accent); h.position.y = 0.6; r.head.add(h); const v = part(new THREE.BoxGeometry(0.5, 0.04, 0.3), L.accent); v.position.set(0, 0.78, 0.5); r.head.add(v); }
+  r.armL = pv(-0.33, 0.44, 0); r.armR = pv(0.33, 0.44, 0);
+  for (const g of [r.armL, r.armR]) { const a = part(new THREE.CylinderGeometry(0.08, 0.08, 0.36, 10), bodyColor); a.position.y = -0.18; g.add(a); const hand = part(new THREE.SphereGeometry(0.09, 10, 8), L.skin); hand.position.y = -0.38; g.add(hand); r.torso.add(g); }
+  const wood = "#8a6440", metal = "#7d8390";
+  if (L.prop === "pack") { const p = part(new THREE.BoxGeometry(0.4, 0.42, 0.22), L.accent); p.position.set(0, 0.3, -0.32); r.torso.add(p); }
+  if (L.prop === "bow") { const b = new THREE.Mesh(new THREE.TorusGeometry(0.45, 0.03, 6, 16, Math.PI), toon(wood)); b.rotation.z = -Math.PI / 2; b.position.set(0, 0.3, -0.3); b.castShadow = true; r.torso.add(b); }
+  if (L.prop === "apron") { const a = part(new THREE.BoxGeometry(0.42, robe ? 0.6 : 0.45, 0.04), L.accent); a.position.set(0, robe ? 0.05 : 0.18, robe ? 0.34 : 0.3); a.rotation.x = robe ? -0.2 : 0; r.torso.add(a); }
+  if (L.prop === "bag") { const b = part(new THREE.BoxGeometry(0.25, 0.25, 0.12), L.accent); b.position.set(-0.38, 0.05, 0.05); r.torso.add(b); }
+  if (L.prop === "hammer") { const h = part(new THREE.CylinderGeometry(0.03, 0.03, 0.5, 6), wood); h.position.set(0, -0.45, 0.12); h.rotation.x = Math.PI / 2; r.armR.add(h); const hd = part(new THREE.BoxGeometry(0.16, 0.14, 0.24), metal); hd.position.set(0, -0.45, 0.38); r.armR.add(hd); }
+  if (L.prop === "hoe") { const h = part(new THREE.CylinderGeometry(0.03, 0.03, 1.3, 6), wood); h.position.set(0, -0.38, 0); r.armR.add(h); const bl = part(new THREE.BoxGeometry(0.22, 0.05, 0.16), metal); bl.position.set(0, 0.26, 0.08); r.armR.add(bl); }
+  if (L.prop === "spear") { const h = part(new THREE.CylinderGeometry(0.03, 0.03, 1.7, 6), wood); h.position.set(0, -0.2, 0); r.armR.add(h); const tip = part(new THREE.ConeGeometry(0.06, 0.2, 8), metal); tip.position.set(0, 0.75, 0); r.armR.add(tip); }
+  if (L.prop === "lantern") { const l = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.2, 0.16), new THREE.MeshLambertMaterial({ color: 0xffe2a0, emissive: 0xffc670, emissiveIntensity: 0.8 })); l.position.set(0, -0.55, 0.06); r.armL.add(l); }
+  root.scale.set(L.build, L.height, L.build);
+  return r;
+}
+function syncRigs() {
+  if (!look3d.renderer) return;
+  const alive = new Set(S.npcs.map((n) => n.id));
+  for (const id of Object.keys(look3d.rigs)) if (!alive.has(id)) { look3d.scene.remove(look3d.rigs[id].root); delete look3d.rigs[id]; delete look3d.sig[id]; }
+  S.npcs.forEach((n, i) => {
+    const L = lookOf(n), sig = JSON.stringify(L);
+    if (look3d.sig[n.id] !== sig) { if (look3d.rigs[n.id]) look3d.scene.remove(look3d.rigs[n.id].root); const r = buildChibi(L); r.root.traverse((o) => { o.userData.npc = n.id; }); r.root.userData.npc = n.id; r.phase = i * 1.1; look3d.scene.add(r.root); look3d.rigs[n.id] = r; look3d.sig[n.id] = sig; }
+  });
+}
+function lookFrame(now) {
+  requestAnimationFrame(lookFrame);
+  const L3 = look3d; if (ui.sec !== "look" || !L3.canvas.isConnected) return;
+  const dt = Math.min(0.1, (now - L3.last) / 1000); L3.last = now; const t = now / 1000;
+  const w = L3.canvas.clientWidth, h = L3.canvas.clientHeight;
+  if (L3.w !== w || L3.h !== h) { L3.w = w; L3.h = h; L3.renderer.setSize(w, h, false); L3.camera.aspect = w / Math.max(h, 1); L3.camera.updateProjectionMatrix(); }
+  const all = L3.target === "all", ids = S.npcs.map((n) => n.id), cols = Math.min(4, Math.ceil(Math.sqrt(ids.length * 1.6)));
+  const labels = document.getElementById("look-labels");
+  ids.forEach((id, i) => {
+    const r = L3.rigs[id]; if (!r) return; const show = all || id === ui.sel.look; r.root.visible = show; if (!show) return;
+    if (all) { const gx = L3.view === "sky" ? 3.6 : 2.4, gz = L3.view === "sky" ? 3.4 : 2.6, row = Math.floor(i / cols), col = i % cols, rowsN = Math.ceil(ids.length / cols); r.root.position.set((col - (cols - 1) / 2) * gx, 0, (row - (rowsN - 1) / 2) * gz); }
+    else r.root.position.set(0, 0.12, 0);
+    const p = t + r.phase, act = L3.action;
+    r.legL.rotation.x = r.legR.rotation.x = r.armL.rotation.x = r.armR.rotation.x = r.torso.rotation.x = 0; r.head.rotation.y = 0;
+    if (act === "walk") { const s = Math.sin(p * 7); r.legL.rotation.x = s * 0.6; r.legR.rotation.x = -s * 0.6; r.armL.rotation.x = -s * 0.5; r.armR.rotation.x = s * 0.5; r.root.position.y += Math.abs(Math.cos(p * 7)) * 0.05; }
+    else if (act === "work") { r.armR.rotation.x = -1.7 + Math.sin(p * 6) * 0.9; r.armL.rotation.x = -0.6; r.torso.rotation.x = 0.18 + Math.sin(p * 6) * 0.06; }
+    else r.head.rotation.y = Math.sin(p * 0.8) * 0.4;
+    r.root.rotation.y = all ? 0 : L3.yaw;
+  });
+  L3.plaza.visible = !all;
+  const sel = L3.rigs[ui.sel.look]; L3.ring.visible = all && !!sel; if (sel && all) L3.ring.position.set(sel.root.position.x, 0.03, sel.root.position.z);
+  const rows = Math.ceil(ids.length / cols); const span = all ? Math.max(cols * 2.4, rows * 2.6) : 2.4;
+  const sky = L3.view === "sky"; const dist = sky ? (all ? span * 3.9 : 22) : (all ? span * 2.2 : 7.5); const pitch = sky ? 0.95 : 0.3; const yaw = all ? L3.yaw : 0;
+  L3.camera.fov = sky ? 40 : 30; L3.camera.updateProjectionMatrix();
+  const ty = sky ? 0 : (all ? 0.8 : 1.05);
+  L3.camPos.lerp(new THREE.Vector3(Math.sin(yaw) * Math.cos(pitch) * dist, ty + Math.sin(pitch) * dist, Math.cos(yaw) * Math.cos(pitch) * dist), Math.min(1, dt * 5));
+  L3.camera.position.copy(L3.camPos); L3.camera.lookAt(0, ty, 0);
+  L3.renderer.render(L3.scene, L3.camera);
+  if (labels) {
+    const v = new THREE.Vector3();
+    labels.querySelectorAll("[data-lbl]").forEach((el) => { const r = L3.rigs[el.dataset.lbl]; if (!r || !all) { el.hidden = true; return; } el.hidden = false; v.set(r.root.position.x, 0, r.root.position.z + 0.9).project(L3.camera); el.style.transform = `translate(${((v.x + 1) / 2) * w}px, ${((1 - v.y) / 2) * h}px) translate(-50%, 0)`; el.classList.toggle("sel", el.dataset.lbl === ui.sel.look); });
+  }
+}
+function secLook() {
+  const n = byId(S.npcs, ui.sel.look) || S.npcs[0]; if (n) ui.sel.look = n.id;
+  const left = listHTML("look", S.npcs.map((x) => ({ ...x, color: lookOf(x).main })), (x) => x.role);
+  if (!n) return head("รูปลักษณ์ตัวละคร", "") + `<div class="work"><div>${left}</div></div>`;
+  const L = n.look, E = lookOf(n), R = S.rolePalette[n.role] || {};
+  const li = (f, label, html) => `<label class="f">${label}${html}</label>`;
+  const sl = (f, label, v) => `<select id="look-${n.id}-${f}" data-look="${f}">${opts(Object.entries(label), v)}</select>`;
+  const col = (f, v, dis) => `<input type="color" id="look-${n.id}-${f}" data-look="${f}" value="${esc(v)}"${dis ? " disabled" : ""}>`;
+  const rng = (f, v, min, max) => `<div class="slider"><span>${f === "height" ? "ส่วนสูง" : "รูปร่าง"}</span><input type="range" min="${min}" max="${max}" id="look-${n.id}-${f}" data-look="${f}" data-pct="1" value="${Math.round(v * 100)}" aria-label="${f}"><output data-out="look-${n.id}-${f}">${Math.round(v * 100)}</output></div>`;
+  const li2 = lookIssues();
+  return head("รูปลักษณ์ตัวละคร", "ตัวละครแบบหัวโต (Chibi) ประกอบจากชิ้นส่วน เปลี่ยนทรงผม ชุด หมวก และของถือได้ สีชุดผูกกับอาชีพเพื่อให้ผู้เล่นจำได้จากมุมเกม ระบบจะใช้ชิ้นส่วนชุดเดียวกันนี้สร้าง NPC ใหม่และลูกหลานรุ่นต่อไปเอง") + `
+  <div class="work lookw"><div>${left}</div>
+  <div class="stack"><div class="card"><h2>${esc(n.name)} <span class="muted" style="font-weight:400">· ${esc(n.role)}</span></h2>
+    <h3>หัว</h3><div class="fields">
+      ${li("hair", "ทรงผม", sl("hair", HAIRS, L.hair))}${li("hairColor", "สีผม", col("hairColor", L.hairColor))}
+      ${li("hat", "หมวก", sl("hat", HATS, L.hat))}
+      <label class="f">เครา<span><input type="checkbox" id="look-${n.id}-beard" data-look="beard"${L.beard ? " checked" : ""}> มีเครา</span></label>
+      <div class="f full">สีผิว<div class="swatches">${SKIN_TONES.map((c) => `<button type="button" class="sw${L.skin === c ? " on" : ""}" style="background:${c}" data-skin="${c}" aria-label="สีผิว ${c}"></button>`).join("")}${col("skin", L.skin)}</div></div></div>
+    <h3>ชุดและของถือ</h3><div class="fields">
+      ${li("outfit", "ชุด", sl("outfit", OUTFITS, L.outfit))}${li("prop", "ของถือ/ติดตัว", sl("prop", PROPS, L.prop))}
+      <label class="f full">สีชุด<span><input type="checkbox" id="look-${n.id}-useRole" data-look="useRole"${L.useRole ? " checked" : ""}> ใช้สีประจำอาชีพ "${esc(n.role)}"</span></label>
+      ${li("main", "สีหลัก", col("main", E.main, L.useRole))}${li("accent", "สีรอง", col("accent", E.accent, L.useRole))}</div>
+    <h3>สัดส่วน (%)</h3>${rng("height", L.height, 85, 115)}${rng("build", L.build, 85, 120)}
+    <div class="row-actions"><button type="button" class="btn" data-act="look-random">สุ่มรูปลักษณ์</button><button type="button" class="btn" data-act="look-role">ใช้ค่าเริ่มต้นของอาชีพ</button></div></div>
+  </div>
+  <div class="card preview" style="max-width:none"><div class="maptools">
+      <div class="seg" role="group" aria-label="แสดง"><button type="button" class="btn small" data-look3d="target:one" aria-pressed="${look3d.target === "one"}">ตัวนี้</button><button type="button" class="btn small" data-look3d="target:all" aria-pressed="${look3d.target === "all"}">ทุกคน</button></div>
+      <div class="seg" role="group" aria-label="มุมกล้อง"><button type="button" class="btn small" data-look3d="view:close" aria-pressed="${look3d.view === "close"}">ใกล้</button><button type="button" class="btn small" data-look3d="view:sky" aria-pressed="${look3d.view === "sky"}">มุมเกม</button></div>
+      <div class="seg" role="group" aria-label="ท่าทาง">${[["walk", "เดิน"], ["work", "ทำงาน"], ["idle", "ยืน"]].map(([k, l]) => `<button type="button" class="btn small" data-look3d="action:${k}" aria-pressed="${look3d.action === k}">${l}</button>`).join("")}</div></div>
+    <div class="stagewrap" id="look-stage">${look3d.ok ? "" : '<p class="muted" style="padding:20px">โหลดระบบ 3D ไม่สำเร็จ ลองรีเฟรชหน้า</p>'}<div id="look-labels" class="look-labels">${S.npcs.map((x) => `<span data-lbl="${x.id}" hidden>${esc(x.name)}</span>`).join("")}</div></div>
+    <p class="note">ลากเพื่อหมุน · โหมด "ทุกคน + มุมเกม" ใช้ตรวจว่ามองจากฟ้าแล้วแยกตัวละครออกไหม คลิกตัวละครในฉากเพื่อเลือก</p>
+    ${li2.length ? `<div class="issues">${li2.map((i) => `<button type="button" data-pick="${esc(i.id)}">⚠ ${esc(i.msg)}</button>`).join("")}</div>` : '<p class="note" style="color:var(--ok)">✓ ทุกคนแยกกันออกจากมุมเกม (ทรงผม/หมวก/ของถือ/สีชุดไม่ซ้ำกันเกินไป)</p>'}
+  </div></div>
+  <div class="card" style="margin-top:16px"><h2>สีและของประจำอาชีพ</h2><p class="note" style="margin:0 0 8px">NPC ที่ติ๊ก "ใช้สีประจำอาชีพ" จะเปลี่ยนตามตารางนี้ ใช้เป็นค่าเริ่มต้นตอนระบบสร้าง NPC ใหม่</p>
+    <div class="tablewrap"><table><thead><tr><th>อาชีพ</th><th>สีหลัก</th><th>สีรอง</th><th>ชุด</th><th>ของถือ</th><th>หมวก</th><th>จำนวน NPC</th></tr></thead><tbody>
+    ${ROLES.map((role) => { const P = S.rolePalette[role]; return `<tr><td>${esc(role)}</td><td><input type="color" id="rp-${role}-main" data-rp="${role}|main" value="${P.main}"></td><td><input type="color" id="rp-${role}-accent" data-rp="${role}|accent" value="${P.accent}"></td><td><select id="rp-${role}-outfit" data-rp="${role}|outfit">${opts(Object.entries(OUTFITS), P.outfit)}</select></td><td><select id="rp-${role}-prop" data-rp="${role}|prop">${opts(Object.entries(PROPS), P.prop)}</select></td><td><select id="rp-${role}-hat" data-rp="${role}|hat">${opts(Object.entries(HATS), P.hat)}</select></td><td class="mono">${S.npcs.filter((x) => x.role === role).length}</td></tr>`; }).join("")}
+    </tbody></table></div></div>`;
+}
+function lookAttach() {
+  if (ui.sec !== "look" || !look3d.ok) return; initLook3d(); syncRigs();
+  const st = document.getElementById("look-stage"); if (st && look3d.canvas.parentNode !== st) st.insertBefore(look3d.canvas, st.firstChild);
+}
+
+const SEC_FN = { look: secLook, overview: secOverview, world: secWorld, npc: secNPC, monster: secMonster, good: secGood, quest: secQuest, crisis: secCrisis, template: secTemplate, power: secPower, balance: secBalance, sim: secSim };
+function derived() { lookAttach(); npcPreview(); monPreview(); goodPreview(); questPreview(); tplPreview(); powerPreview(); simOut(); drawMap(); renderNav(); }
 function render() { $("#main").innerHTML = SEC_FN[ui.sec](); derived(); if (ui.sec === "sim" && !ui.simResult) { ui.simResult = simulate(ui.sim); simOut(); } }
 function changed(full) { save(); if (ui.sec === "sim") ui.simResult = simulate(ui.sim); else ui.simResult = null; if (full) render(); else derived(); }
 
@@ -820,6 +1049,19 @@ main.addEventListener("input", (e) => {
     setPath(item, t.dataset.field, v);
     if (t.dataset.field === "name") { const lab = document.querySelector(`[data-label="${CSS.escape(item.id)}"]`); if (lab) lab.textContent = v || "(ไม่มีชื่อ)"; }
     changed(t.tagName === "SELECT" && ["role", "event", "kind", "threat", "a", "b"].includes(t.dataset.field)); return;
+  }
+  if (t.dataset.look) {
+    const n = byId(S.npcs, ui.sel.look); if (!n) return; const f = t.dataset.look;
+    n.look[f] = t.type === "checkbox" ? t.checked : t.dataset.pct ? Number(t.value) / 100 : t.value;
+    if (f === "main" || f === "useRole") n.color = lookOf(n).main;
+    save(); syncRigs(); renderNav();
+    if (["useRole", "hair", "hat", "prop", "hairColor", "main", "outfit", "beard"].includes(f) && t.type !== "color") render();
+    return;
+  }
+  if (t.dataset.rp) {
+    const [role, k] = t.dataset.rp.split("|"); S.rolePalette[role][k] = t.value;
+    for (const n of S.npcs) if (n.role === role && n.look.useRole) n.color = lookOf(n).main;
+    save(); syncRigs(); renderNav(); if (t.tagName === "SELECT") render(); return;
   }
   if (t.dataset.sc) { ui.sc[t.dataset.sc] = Number(t.value); npcPreview(); return; }
   if (t.dataset.stock) { ui.stock = Number(t.value); goodPreview(); return; }
@@ -837,9 +1079,17 @@ main.addEventListener("click", (e) => {
   const gt = e.target.closest("[data-goto]"); if (gt) { const sec = gt.dataset.goto, id = gt.dataset.gotoId; go(sec, id ? (sec === "world" ? { kind: gt.dataset.gotoKind || "node", id } : id) : null); return; }
   const tok = e.target.closest("[data-tok]"); if (tok) { const ta = document.querySelector("textarea[data-field='text']"); const t = byId(S.templates, ui.sel.template); if (ta && t) { const p = ta.selectionStart ?? ta.value.length; ta.value = ta.value.slice(0, p) + "{" + tok.dataset.tok + "}" + ta.value.slice(p); t.text = ta.value; changed(); ta.focus(); } return; }
   const rb = e.target.closest("[data-reset-bal]"); if (rb) { setPath(S.balance, rb.dataset.resetBal, getPath(DEFAULT.balance, rb.dataset.resetBal)); changed(true); return; }
+  const sk = e.target.closest("[data-skin]"); if (sk) { const n = byId(S.npcs, ui.sel.look); n.look.skin = sk.dataset.skin; save(); render(); return; }
+  const l3 = e.target.closest("[data-look3d]"); if (l3) { const [k, v] = l3.dataset.look3d.split(":"); look3d[k] = v; render(); return; }
   const b = e.target.closest("[data-act]"); if (!b) return; const act = b.dataset.act;
+  if (act === "look-random" || act === "look-role") {
+    const n = byId(S.npcs, ui.sel.look); if (!n) return;
+    if (act === "look-random") n.look = { ...randomLook(n.role), name: undefined };
+    else { const P = S.rolePalette[n.role]; Object.assign(n.look, { outfit: P.outfit, prop: P.prop, hat: P.hat, useRole: true }); }
+    delete n.look.name; n.color = lookOf(n).main; changed(true); return;
+  }
   const n = byId(S.npcs, ui.sel.npc);
-  if (act === "add-npc") { const id = newId("npc", S.npcs); S.npcs.push({ id, name: "NPC ใหม่", role: "ชาวนา", home: S.nodes[0]?.id || "", color: "#8fa0c8", traits: { bravery: 50, caution: 50, generosity: 50, ambition: 50, sociability: 50 }, skills: { combat: 20, gathering: 30, healing: 10, crafting: 20, negotiation: 20 }, goalShort: "", goalLong: "", rel: [] }); ui.sel.npc = id; changed(true); }
+  if (act === "add-npc") { const id = newId("npc", S.npcs); S.npcs.push({ id, name: "NPC ใหม่", role: "ชาวนา", home: S.nodes[0]?.id || "", color: "#8fa0c8", traits: { bravery: 50, caution: 50, generosity: 50, ambition: 50, sociability: 50 }, skills: { combat: 20, gathering: 30, healing: 10, crafting: 20, negotiation: 20 }, goalShort: "", goalLong: "", rel: [] }); ensureLooks(); ui.sel.npc = id; ui.sel.look = id; changed(true); }
   else if (act === "add-rel" && n) { const other = S.npcs.find((x) => x.id !== n.id && !n.rel.some((r) => r.to === x.id)) || S.npcs.find((x) => x.id !== n.id); n.rel.push({ to: other.id, trust: 50, affinity: 50, respect: 50, grievance: 0, why: "" }); changed(true); }
   else if (act === "del-rel" && n) { n.rel.splice(+b.dataset.i, 1); changed(true); }
   else if (act === "add-monster") { const id = newId("monster", S.monsters); S.monsters.push({ id, name: "มอนสเตอร์ใหม่", kind: "common", habitat: S.nodes.find((x) => x.type === "wild")?.id || S.nodes[0]?.id, threat: 10, gmin: 1, gmax: 3, behavior: "", drops: "" }); ui.sel.monster = id; changed(true); }
@@ -865,8 +1115,8 @@ main.addEventListener("click", (e) => {
 // top bar
 $("#json-btn").addEventListener("click", () => {
   const d = $("#drawer"); if (!d.hidden) { d.hidden = true; return; }
-  const pick = { world: { nodes: S.nodes, routes: S.routes.map(({ _lx, _ly, ...r }) => r) }, npc: { npcs: S.npcs }, monster: { monsters: S.monsters }, good: { goods: S.goods }, quest: { quests: S.quests }, crisis: { crisis: S.crisis }, template: { templates: S.templates }, power: { powers: S.balance.powers, influence: S.balance.influence }, balance: { balance: S.balance } }[ui.sec];
-  const file = { world: "world.json", npc: "npcs.json", monster: "monsters.json", good: "goods.json", quest: "quests.json", crisis: "crisis.json", template: "chronicle_templates.json", power: "balance.json (powers)", balance: "balance.json" }[ui.sec];
+  const pick = { world: { nodes: S.nodes, routes: S.routes.map(({ _lx, _ly, ...r }) => r) }, npc: { npcs: S.npcs }, look: { rolePalette: S.rolePalette, looks: Object.fromEntries(S.npcs.map((n) => [n.id, n.look])) }, monster: { monsters: S.monsters }, good: { goods: S.goods }, quest: { quests: S.quests }, crisis: { crisis: S.crisis }, template: { templates: S.templates }, power: { powers: S.balance.powers, influence: S.balance.influence }, balance: { balance: S.balance } }[ui.sec];
+  const file = { world: "world.json", npc: "npcs.json", look: "character_looks.json", monster: "monsters.json", good: "goods.json", quest: "quests.json", crisis: "crisis.json", template: "chronicle_templates.json", power: "balance.json (powers)", balance: "balance.json" }[ui.sec];
   $("#drawer-title").textContent = pick ? "data/" + file : "ทั้งโครงการ";
   $("#json-out").textContent = JSON.stringify(pick || { ...S, routes: S.routes.map(({ _lx, _ly, ...r }) => r) }, null, 2); d.hidden = false;
 });
@@ -877,7 +1127,7 @@ $("#copy-json").addEventListener("click", () => {
 });
 const resetBtn = $("#reset-btn");
 resetBtn.addEventListener("click", () => {
-  if (resetBtn.dataset.armed) { S = clone(DEFAULT); try { localStorage.removeItem(KEY); } catch (e) {} delete resetBtn.dataset.armed; resetBtn.textContent = "คืนค่าตัวอย่าง"; ui.simResult = null; toast("คืนค่าตัวอย่างแล้ว"); render(); return; }
+  if (resetBtn.dataset.armed) { S = clone(DEFAULT); ensureLooks(); try { localStorage.removeItem(KEY); } catch (e) {} delete resetBtn.dataset.armed; resetBtn.textContent = "คืนค่าตัวอย่าง"; ui.simResult = null; toast("คืนค่าตัวอย่างแล้ว"); render(); return; }
   resetBtn.dataset.armed = "1"; resetBtn.textContent = "กดอีกครั้งเพื่อยืนยัน"; setTimeout(() => { delete resetBtn.dataset.armed; resetBtn.textContent = "คืนค่าตัวอย่าง"; }, 3000);
 });
 window.addEventListener("resize", () => { drawMap(); goodPreview(); simOut(); });
