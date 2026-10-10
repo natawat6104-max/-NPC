@@ -1099,7 +1099,9 @@ function structuralMap(info) {
   const foot = legs[0][Math.min(2, legs[0].length - 1)], toe = legs[0][Math.min(3, legs[0].length - 1)];
   const fwd = W(toe).sub(W(foot)).setY(0); if (fwd.lengthSq() < 1e-8) fwd.set(0, 0, 1); fwd.normalize();
   const left = new THREE.Vector3(fwd.z, 0, -fwd.x), side = (b, ref) => (W(b).sub(ref).dot(left) > 0 ? "Left" : "Right");
-  const map = { Hips: nm(hips) };
+  // A lone root bone above the hips (Meshy SmartRig) is the Hips for Godot: clip hips motion is absolute from the skeleton root.
+  let top = hips; while (top.parent && top.parent.isBone && kids(top.parent).length === 1) top = top.parent;
+  const map = { Hips: nm(top) };
   for (const c of legs.slice(0, 2)) { const S = side(c[0], hp); ["UpperLeg", "LowerLeg", "Foot", "Toes"].forEach((k, i) => { if (c[i] && (i < 3 || c.length > 4 || kids(c[i]).length)) map[S + k] = nm(c[i]); }); }
   const sp = chain(up), chest = sp[sp.length - 1]; if (kids(chest).length < 3) return null;
   map.Spine = nm(sp[0]); if (sp.length >= 3) { map.Chest = nm(sp[sp.length - 2]); map.UpperChest = nm(chest); } else if (sp.length === 2) map.Chest = nm(chest);
@@ -1209,7 +1211,7 @@ async function importBodyBuffer(buf, fileName, size, extra = {}) {
 
 // The sample base body ships next to the page, so the studio shows the team's model without importing it first.
 // .glb in the repo; base64 text where the host only serves text types.
-const SAMPLE_BODY = { v: 2, src: "models/char10-base.glb", alt: "models/char10-base.glb.b64.txt", file: "char10-base.glb", name: "ร่างพื้นฐาน (Meshy Character 10)" };
+const SAMPLE_BODY = { v: 3, src: "models/char10-base.glb", alt: "models/char10-base.glb.b64.txt", file: "char10-base.glb", name: "ร่างพื้นฐาน (Meshy Character 10)" };
 async function fetchModel(src, alt) {
   try { const r = await fetch(src); if (r.ok) return await r.arrayBuffer(); } catch (e) {}
   if (!alt) return null;
@@ -1220,12 +1222,13 @@ async function loadSampleBody(manual) {
   if (!look3d.ok || sampleLoading) return; sampleLoading = true;
   try {
     const buf = await fetchModel(SAMPLE_BODY.src, SAMPLE_BODY.alt); if (!buf) throw new Error("missing");
-    // Swap out an older team sample; bodies the user imported themselves stay.
-    const old = S.bodies.filter((b) => b.src && b.src !== SAMPLE_BODY.src).map((b) => b.id);
+    // Swap out an older team sample (re-mapped from scratch, keeping its look settings); bodies the user imported themselves stay.
+    const prev = S.bodies.find((b) => b.src === SAMPLE_BODY.src), old = S.bodies.filter((b) => b.src).map((b) => b.id);
     S.bodies = S.bodies.filter((b) => !old.includes(b.id)); for (const id of old) { modelStore.del(id); delete bodyCache[id]; }
     S.sampleBodyDone = SAMPLE_BODY.v;
     await importBodyBuffer(buf, SAMPLE_BODY.file, buf.byteLength, { name: SAMPLE_BODY.name, src: SAMPLE_BODY.src, alt: SAMPLE_BODY.alt });
-    const id = S.bodies[S.bodies.length - 1].id; for (const n of S.npcs) if (!n.look.body || old.includes(n.look.body)) n.look.body = id; ui.sel.body = id; save(); render();
+    const nb = S.bodies[S.bodies.length - 1], id = nb.id; if (prev) for (const k of ["attach", "hairMode", "toon", "matSlots"]) if (prev[k] !== undefined) nb[k] = prev[k];
+    for (const n of S.npcs) if (!n.look.body || old.includes(n.look.body)) n.look.body = id; ui.sel.body = id; save(); render();
   } catch (e) { if (manual) toast("โหลดโมเดลตัวอย่างไม่ได้ (ต้องเปิดหน้านี้ผ่านเว็บ ไม่ใช่เปิดไฟล์ในเครื่อง)"); }
   sampleLoading = false;
 }
@@ -1271,6 +1274,11 @@ function buildImported(L, B) {
   }
   const toRoot = (p) => model.localToWorld(p.clone()); // template model space -> rig space (root is at identity here)
   const wpos = (slot) => r.b[slot].bone.getWorldPosition(new THREE.Vector3());
+  // For retargeted clips: nearest mapped ancestor of each slot, rest positions in rig space, and the hips' parent frame.
+  const slotOf = new Map(Object.entries(r.b).map(([k, v]) => [v.bone, k]));
+  for (const v of Object.values(r.b)) { let p = v.bone.parent, d = 0; v.anc = null; while (p) { if (!v.anc && slotOf.has(p)) v.anc = slotOf.get(p); d++; p = p.parent; } v.depth = d; }
+  r.restP = Object.fromEntries(Object.keys(r.b).map((k) => [k, wpos(k)]));
+  if (r.b.Hips) { const hb = r.b.Hips.bone; r.hips = { bone: hb, restLocal: hb.position.clone(), restRoot: wpos("Hips"), parentInv: hb.parent.matrixWorld.clone().invert(), h: wpos("Hips").y }; }
   // Arms in the file are usually in T/A-pose: compute the rotation that lets them hang down.
   r.down = {};
   for (const [side, sx] of [["Left", 1], ["Right", -1]]) {
@@ -1314,7 +1322,16 @@ function buildImported(L, B) {
 }
 function setBone(r, slot, R) { const b = r.b[slot]; if (!b) return; b.bone.quaternion.copy(b.Pinv).multiply(R).multiply(b.P).multiply(b.rest); }
 function restBone(r, slot) { const b = r.b[slot]; if (b) b.bone.quaternion.copy(b.rest); }
-function animImported(r, act, p, dt) {
+function gripFingers(r, on, skip) {
+  for (const side of ["Left", "Right"]) { const k = r.hold[side] || (side === "Right" && on) ? 1.05 : 0.18; for (const f of r.fingers[side]) if (!skip || !skip[f.slot]) setBone(r, f.slot, new THREE.Quaternion().setFromAxisAngle(f.axis, f.amount * k)); }
+}
+function animImported(r, act, p, dt, fb) {
+  if (act.startsWith("anim:")) {
+    const K = animClip(act.slice(5));
+    if (K) { if (r.playing) { r.mixer.stopAllAction(); r.playing = null; } playClip(r, K, p); gripFingers(r, false, K.rot); return; }
+    act = fb || "idle";
+  }
+  if (r.hips) r.hips.bone.position.copy(r.hips.restLocal);
   if (act.startsWith("clip:")) {
     const name = act.slice(5); if (r.mixer) { if (r.playing !== name) { r.mixer.stopAllAction(); for (const k of Object.keys(r.b)) restBone(r, k); const clip = r.clips.find((c) => (c.name || "clip") === name); if (clip) r.mixer.clipAction(clip).play(); r.playing = name; } r.mixer.update(dt); }
     return;
@@ -1337,7 +1354,7 @@ function animImported(r, act, p, dt) {
     setBone(r, "Head", qy(Math.sin(p * 0.8) * 0.4));
   }
   // Hands holding a tool close into a grip; empty hands stay slightly relaxed.
-  for (const side of ["Left", "Right"]) { const k = r.hold[side] || (side === "Right" && act === "work" && !idle) ? 1.05 : 0.18; for (const f of r.fingers[side]) setBone(r, f.slot, new THREE.Quaternion().setFromAxisAngle(f.axis, f.amount * k)); }
+  gripFingers(r, act === "work" && !idle);
 }
 function animChibi(r, act, p) {
   r.legL.rotation.x = r.legR.rotation.x = r.armL.rotation.x = r.armR.rotation.x = r.torso.rotation.x = 0; r.head.rotation.y = 0;
@@ -1358,6 +1375,118 @@ let bodiesBooted = false;
 function bootBodies() {
   if (bodiesBooted || !look3d.ok) return; bodiesBooted = true;
   for (const B of S.bodies) if (!bodyCache[B.id]) loadBody(B).then(() => { if (["body", "look"].includes(ui.sec)) render(); else renderNav(); });
+}
+
+// ======================= real animation clips (assets/animations) =======================
+// Clips carry bones + motion only, on Mixamo/Meshy skeletons, so they are retargeted onto the base body by humanoid slot.
+// Each slot follows the source bone's world rotation relative to its rest pose, after the body's rest bone is first turned
+// onto the source's rest direction (a T-pose clip then drives an A-pose body correctly). Hips height scales the hips motion.
+// The page must be served from the repo root so ../../assets/ is reachable.
+const ANIM_ROOT = "../../assets/animations/";
+const ACTIVITIES = [["idle", "ยืน"], ["walk", "เดิน"], ["smith", "ตีเหล็ก"], ["harvest", "เก็บเกี่ยว"], ["carry", "แบกของ"], ["heal", "รักษา"], ["talk", "คุย"], ["sit", "นั่ง"], ["guard", "ยาม"]];
+const DEFAULT_ANIM_SET = { idle: "general/idle.glb", walk: "general/female_walking.glb", smith: "combat/axe_attack_downward.glb", harvest: "work/farm_pull_plant.glb", carry: "work/farm_holding_walk.glb", heal: "combat/magic_1h_cast_spell_01.glb", talk: "work/talk_weight_shift.glb", sit: "work/farm_kneeling_idle.glb", guard: "guard/spear_walk_inplace.glb" };
+const ROLE_WORK = { "ช่างตีเหล็ก": "smith", "ชาวนา": "harvest", "ผู้รักษา": "heal", "พ่อค้า": "talk", "ยามรักษาการณ์": "guard", "นักผจญภัย": "carry", "นักธนู": "guard" }; // what "ทำงาน" plays per role
+const ACT_FALLBACK = { idle: "idle", walk: "walk", carry: "walk", guard: "walk", talk: "idle", sit: "idle" }; // hand-made motion while loading / on the chibi
+const ANIM_GROUPS = { general: "ทั่วไป", work: "งาน", guard: "ยาม/ถืออาวุธ", combat: "ต่อสู้", other: "อื่น ๆ" };
+const CHILD_SLOT = {}; // slot -> child slots that give its rest-pose direction
+{
+  const c = (k, v) => (CHILD_SLOT[k] = v);
+  c("Hips", ["Spine"]); c("Spine", ["Chest", "UpperChest", "Neck"]); c("Chest", ["UpperChest", "Neck"]); c("UpperChest", ["Neck", "Head"]); c("Neck", ["Head"]);
+  for (const s of ["Left", "Right"]) {
+    c(s + "Shoulder", [s + "UpperArm"]); c(s + "UpperArm", [s + "LowerArm"]); c(s + "LowerArm", [s + "Hand"]); c(s + "Hand", [s + "MiddleProximal", s + "IndexProximal"]);
+    c(s + "UpperLeg", [s + "LowerLeg"]); c(s + "LowerLeg", [s + "Foot"]); c(s + "Foot", [s + "Toes"]);
+    for (const f of ["Index", "Middle", "Ring", "Little"]) { c(s + f + "Proximal", [s + f + "Intermediate"]); c(s + f + "Intermediate", [s + f + "Distal"]); }
+    c(s + "ThumbMetacarpal", [s + "ThumbProximal"]); c(s + "ThumbProximal", [s + "ThumbDistal"]);
+  }
+}
+const animLib = { status: "idle", clips: [], byFile: {}, baked: {} };
+const animFile = (a) => (S.animSet && S.animSet[a]) || DEFAULT_ANIM_SET[a];
+async function loadAnimIndex() {
+  if (animLib.status !== "idle") return; animLib.status = "loading";
+  try { const r = await fetch(ANIM_ROOT + "index.json"); if (!r.ok) throw new Error(r.status); const j = await r.json(); animLib.clips = j.clips; animLib.byFile = Object.fromEntries(j.clips.map((x) => [x.file, x])); animLib.status = "ok"; }
+  catch (e) { animLib.status = "missing"; }
+  if (["body", "look"].includes(ui.sec)) render();
+}
+// Baked clip, or null while it loads (the first ask starts the download).
+function animClip(file) {
+  const b = animLib.baked[file]; if (b) return b.status === "ok" ? b : null;
+  if (animLib.status !== "ok" || !animLib.byFile[file]) return null;
+  animLib.baked[file] = { status: "loading" };
+  fetch(ANIM_ROOT + file).then((r) => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); }).then((buf) => parseModel(buf, file))
+    .then(({ scene, animations }) => { if (!animations[0]) throw new Error("ไม่มีท่าในไฟล์"); animLib.baked[file] = { ...bakeClip(scene, animations[0]), file, status: "ok" }; })
+    .catch((e) => { animLib.baked[file] = { status: "error", error: e.message || String(e) }; });
+  return null;
+}
+// Sample the clip at 30 fps into per-slot world rotations relative to rest, in a frame where the source faces +Z.
+function bakeClip(scene, clip) {
+  const info = analyzeModel(scene), map = autoMapBones(info), yaw = guessYaw(info, map), bone = (k) => info.boneObj[map[k]];
+  const Qy = new THREE.Quaternion().setFromAxisAngle(AY, (yaw * Math.PI) / 180), Qyi = Qy.clone().invert();
+  const slots = HUMANOID.concat(FINGERS).map(([k]) => k).filter((k) => bone(k));
+  scene.updateMatrixWorld(true);
+  const restQi = {}, restP = {}; let minY = Infinity;
+  for (const k of slots) { restQi[k] = bone(k).getWorldQuaternion(new THREE.Quaternion()).invert(); restP[k] = bone(k).getWorldPosition(new THREE.Vector3()).applyQuaternion(Qy); }
+  for (const b of Object.values(info.boneObj)) minY = Math.min(minY, b.getWorldPosition(new THREE.Vector3()).y);
+  const fps = 30, n = Math.max(2, Math.round(clip.duration * fps) + 1), hipsH = restP.Hips ? Math.max(1e-6, restP.Hips.y - minY) : 1;
+  const rot = {}; for (const k of slots) rot[k] = new Float32Array(n * 4); const hip = new Float32Array(n * 3);
+  const mixer = new THREE.AnimationMixer(scene); mixer.clipAction(clip).play();
+  const q = new THREE.Quaternion(), prev = {}, v = new THREE.Vector3();
+  for (let i = 0; i < n; i++) {
+    mixer.setTime(Math.min(clip.duration, i / fps)); scene.updateMatrixWorld(true);
+    for (const k of slots) {
+      bone(k).getWorldQuaternion(q).multiply(restQi[k]).premultiply(Qy).multiply(Qyi);
+      if (prev[k] && prev[k].dot(q) < 0) q.set(-q.x, -q.y, -q.z, -q.w); prev[k] = q.clone(); // keep neighbours on one hemisphere for slerp
+      q.toArray(rot[k], i * 4);
+    }
+    if (restP.Hips) bone("Hips").getWorldPosition(v).applyQuaternion(Qy).sub(restP.Hips).divideScalar(hipsH).toArray(hip, i * 3);
+  }
+  return { rot, hip, n, fps, duration: clip.duration, restP, bones: info.bones.length };
+}
+// Per rig and clip: the rest-pose alignment of each body bone onto the clip's rest direction.
+function bindClip(r, K) {
+  r.binds = r.binds || {}; if (r.binds[K.file]) return r.binds[K.file];
+  const order = Object.keys(r.b).sort((a, b) => r.b[a].depth - r.b[b].depth), A = {};
+  for (const k of order) {
+    A[k] = new THREE.Quaternion(); if (!K.restP[k]) continue;
+    const c = (CHILD_SLOT[k] || []).find((x) => r.restP[x] && K.restP[x]); if (!c) continue;
+    const dt = r.restP[c].clone().sub(r.restP[k]), ds = K.restP[c].clone().sub(K.restP[k]);
+    if (dt.lengthSq() > 1e-12 && ds.lengthSq() > 1e-12) A[k].setFromUnitVectors(dt.normalize(), ds.normalize());
+  }
+  return (r.binds[K.file] = { order, A });
+}
+function playClip(r, K, t) {
+  const bd = bindClip(r, K), f = (((t % K.duration) + K.duration) % K.duration) * K.fps, i0 = Math.min(K.n - 1, Math.floor(f)), i1 = Math.min(K.n - 1, i0 + 1), a = f - Math.floor(f);
+  const W = {}, q1 = new THREE.Quaternion();
+  for (const k of bd.order) {
+    const anc = r.b[k].anc, src = K.rot[k];
+    if (!src) { W[k] = anc ? W[anc] : null; restBone(r, k); continue; } // unanimated: rides on its parent
+    W[k] = new THREE.Quaternion().fromArray(src, i0 * 4).slerp(q1.fromArray(src, i1 * 4), a).multiply(bd.A[k]);
+    setBone(r, k, anc && W[anc] ? W[anc].clone().invert().multiply(W[k]) : W[k]);
+  }
+  if (r.hips) { // in place: keep the vertical motion (crouch, fall), drop travel so the preview stays on its spot
+    const o = new THREE.Vector3().fromArray(K.hip, i0 * 3).lerp(new THREE.Vector3().fromArray(K.hip, i1 * 3), a).multiplyScalar(r.hips.h); o.x = 0; o.z = 0;
+    r.hips.bone.position.copy(r.hips.restRoot).add(o).applyMatrix4(r.hips.parentInv);
+  }
+}
+// The action buttons name an activity, "work" (per role), an index clip ("anim:<file>") or a clip inside the body file.
+function resolveAct(n, a) {
+  if (a.startsWith("clip:") || a.startsWith("anim:")) return { act: a, fb: "idle" };
+  const key = a === "work" ? ROLE_WORK[n && n.role] || "carry" : a, fb = a === "work" ? "work" : ACT_FALLBACK[key] || "work";
+  const file = animFile(key); return { act: file && animLib.status === "ok" && animLib.byFile[file] ? "anim:" + file : fb, fb };
+}
+let animOptsCache = null;
+function animOptions(cur) {
+  if (!animOptsCache) animOptsCache = Object.entries(ANIM_GROUPS).map(([g, gl]) => `<optgroup label="${esc(gl)}">${animLib.clips.filter((x) => x.group === g).map((x) => `<option value="${esc(x.file)}">${esc(x.clip_name)} · ${esc(x.description_th)}</option>`).join("")}</optgroup>`).join("");
+  return cur ? animOptsCache.replace(`value="${esc(cur)}"`, `value="${esc(cur)}" selected`) : `<option value="">— เลือกท่า —</option>` + animOptsCache;
+}
+function animCard() {
+  const hd = `<h2>ท่าทางของกิจกรรม</h2>`;
+  if (animLib.status === "missing") return `<div class="card">${hd}<p class="note bad">โหลดรายการท่า <span class="mono">assets/animations/index.json</span> ไม่ได้ — ต้องเปิดเว็บเซิร์ฟเวอร์ที่โฟลเดอร์หลักของ repo (<span class="mono">python -m http.server</span>) แล้วเปิด <span class="mono">/docs/mockups/star-studio.html</span> ระหว่างนี้ใช้ท่าที่ทำเอง</p></div>`;
+  if (animLib.status !== "ok") return `<div class="card">${hd}<p class="muted">กำลังโหลดรายการท่า…</p></div>`;
+  const rows = ACTIVITIES.map(([k, l]) => { const f = animFile(k), m = animLib.byFile[f], b = animLib.baked[f];
+    return `<tr><td>${esc(l)}${Object.entries(ROLE_WORK).filter(([, v]) => v === k).length ? `<br><small class="muted">ทำงานของ ${esc(Object.entries(ROLE_WORK).filter(([, v]) => v === k).map(([r]) => r).join(", "))}</small>` : ""}</td><td><select id="animset-${k}" data-animset="${k}">${animOptions(f)}</select>${m ? `<br><small class="muted">${m.duration_s.toFixed(1)} วินาที · กระดูก ${m.bones}${m.loop ? " · วนได้" : ""}${b && b.status === "error" ? " · โหลดไม่ได้" : ""}</small>` : '<br><small class="bad">ไม่พบไฟล์นี้ในรายการ</small>'}</td></tr>`; }).join("");
+  return `<div class="card">${hd}<p class="note">เลือกท่าจริงจาก <span class="mono">assets/animations</span> (${animLib.clips.length} ท่า) ให้แต่ละกิจกรรม ระบบแปลงท่าจากกระดูก Mixamo/Meshy ไปใช้กับร่างนี้ผ่านการจับคู่กระดูกด้านบน ปุ่ม "ทำงาน" จะเล่นท่าตามอาชีพของ NPC</p>
+    <div class="tablewrap"><table><thead><tr><th>กิจกรรม</th><th>ท่า</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="row-actions"><button type="button" class="btn" data-act="animset-reset">ใช้ท่าเริ่มต้น</button></div></div>`;
 }
 
 function secBody() {
@@ -1399,14 +1528,17 @@ function secBody() {
     </div>`;
   }
   const n = byId(S.npcs, ui.sel.look) || S.npcs[0];
-  const acts = [["walk", "เดิน"], ["work", "ทำงาน"], ["idle", "ยืน"]].concat((c.animations || []).filter((a) => a.duration > 0.2).map((a) => ["clip:" + (a.name || "clip"), "▶ " + (a.name || "clip")]));
+  const acts = [["work", "ทำงาน"], ...ACTIVITIES].concat((c.animations || []).filter((a) => a.duration > 0.2).map((a) => ["clip:" + (a.name || "clip"), "▶ " + (a.name || "clip")]));
+  const tryAnim = look3d.action.startsWith("anim:") ? look3d.action.slice(5) : "", tm = animLib.byFile[tryAnim], tb = animLib.baked[tryAnim];
   const right = `<div class="card preview" style="max-width:none"><div class="maptools">
       <label class="f" style="margin:0">ลองกับ<select id="body-try" data-body-try="1">${opts(S.npcs.map((x) => [x.id, x.name]), n && n.id)}</select></label>
       <div class="seg" role="group" aria-label="ท่าทาง">${acts.map(([k, l]) => `<button type="button" class="btn small" data-look3d="action:${esc(k)}" aria-pressed="${look3d.action === k}">${esc(l)}</button>`).join("")}</div>
+      ${animLib.status === "ok" ? `<label class="f" style="margin:0;min-width:220px">ลองท่าอื่น<select id="anim-try" data-anim-try="1">${animOptions(tryAnim)}</select></label>` : ""}
       <label class="f" style="margin:0"><span><input type="checkbox" id="body-bones" data-body-bones="1"${body3d.bones ? " checked" : ""}> แสดงกระดูก</span></label></div>
     <div class="stagewrap" id="look-stage"><div id="look-labels" class="look-labels"></div></div>
-    <p class="note">ลากเพื่อหมุน · หมวก ผม และของถือมาจากรูปลักษณ์ของ NPC ที่เลือก ถ้าหมวกไม่พอดีหัวให้ปรับขนาด/ความสูงทางซ้าย</p></div>`;
-  return intro + `<div class="work lookw"><div>${left}</div><div class="stack">${mid}</div>${right}</div>`;
+    ${tm ? `<p class="note">▶ ${esc(tm.description_th)} · ${tm.duration_s.toFixed(1)} วินาที · ${esc(tm.skeleton)} ${tm.bones} กระดูก${tb && tb.status === "error" ? ` · <span class="bad">โหลดไม่ได้: ${esc(tb.error)}</span>` : ""}</p>` : ""}
+    <p class="note">ลากเพื่อหมุน · หมวก ผม และของถือมาจากรูปลักษณ์ของ NPC ที่เลือก ถ้าหมวกไม่พอดีหัวให้ปรับขนาด/ความสูงทางซ้าย · ท่าจริงเล่นแบบอยู่กับที่</p></div>`;
+  return intro + `<div class="work lookw"><div>${left}</div><div class="stack">${mid}${c.status === "ok" ? animCard() : ""}</div>${right}</div>`;
 }
 function lookFrame(now) {
   requestAnimationFrame(lookFrame);
@@ -1420,8 +1552,8 @@ function lookFrame(now) {
     const r = L3.rigs[id]; if (!r) return; const show = all || id === ui.sel.look; r.root.visible = show; if (!show) return;
     if (all) { const gx = L3.view === "sky" ? 3.6 : 2.4, gz = L3.view === "sky" ? 3.4 : 2.6, row = Math.floor(i / cols), col = i % cols, rowsN = Math.ceil(ids.length / cols); r.root.position.set((col - (cols - 1) / 2) * gx, 0, (row - (rowsN - 1) / 2) * gz); }
     else r.root.position.set(0, 0.12, 0);
-    const p = t + r.phase, act = L3.action;
-    if (r.imported) animImported(r, act, p, dt); else animChibi(r, act, p);
+    const p = t + r.phase, ra = resolveAct(byId(S.npcs, id), L3.action);
+    if (r.imported) animImported(r, ra.act, p, dt, ra.fb); else animChibi(r, ra.act.includes(":") ? ra.fb : ra.act, p);
     r.root.rotation.y = all ? 0 : L3.yaw;
   });
   L3.plaza.visible = !all;
@@ -1480,7 +1612,7 @@ function secLook() {
     </tbody></table></div></div>`;
 }
 function lookAttach() {
-  if (!["look", "body"].includes(ui.sec) || !look3d.ok) return; initLook3d(); bootBodies(); syncRigs();
+  if (!["look", "body"].includes(ui.sec) || !look3d.ok) return; initLook3d(); bootBodies(); loadAnimIndex(); syncRigs();
   const st = document.getElementById("look-stage"); if (st && look3d.canvas.parentNode !== st) st.insertBefore(look3d.canvas, st.firstChild);
 }
 
@@ -1521,6 +1653,8 @@ main.addEventListener("input", (e) => {
     save(); syncRigs(); renderNav(); if (t.dataset.bmap || (t.dataset.body && t.dataset.body !== "name")) render(); return;
   }
   if (t.dataset.bodyTry) { ui.sel.look = t.value; syncRigs(); return; }
+  if (t.dataset.animset) { S.animSet = { ...(S.animSet || {}), [t.dataset.animset]: t.value }; look3d.action = t.dataset.animset; save(); render(); return; }
+  if (t.dataset.animTry) { if (t.value) { look3d.action = "anim:" + t.value; render(); } return; }
   if (t.dataset.bodyBones) { body3d.bones = t.checked; return; }
   if (t.dataset.sc) { ui.sc[t.dataset.sc] = Number(t.value); npcPreview(); return; }
   if (t.dataset.stock) { ui.stock = Number(t.value); goodPreview(); return; }
@@ -1548,6 +1682,7 @@ main.addEventListener("click", (e) => {
   const by = e.target.closest("[data-body-yaw]"); if (by) { const B = byId(S.bodies, ui.sel.body); if (B) { B.yaw = Number(by.dataset.bodyYaw); save(); render(); } return; }
   const b = e.target.closest("[data-act]"); if (!b) return; const act = b.dataset.act;
   if (act === "body-sample") { loadSampleBody(true); return; }
+  if (act === "animset-reset") { delete S.animSet; save(); render(); toast("ใช้ท่าเริ่มต้นแล้ว"); return; }
   if (act === "body-all" || act === "body-del" || act === "body-automap") {
     const B = byId(S.bodies, ui.sel.body); if (!B) return;
     if (act === "body-del" && !b.dataset.armed) { b.dataset.armed = "1"; b.textContent = "กดอีกครั้งเพื่อลบ"; setTimeout(() => { if (b.isConnected) { delete b.dataset.armed; b.textContent = "ลบร่างนี้"; } }, 3000); return; }
