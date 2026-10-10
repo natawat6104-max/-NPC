@@ -1020,19 +1020,25 @@ function parseModel(buf, fileName) {
 const realName = (o) => o.userData.name || o.name;
 function analyzeModel(scene) {
   scene.updateMatrixWorld(true);
-  const bones = [], meshes = [], mats = new Map(); let verts = 0, tris = 0, skinned = 0;
+  const bones = [], meshes = [], mats = new Map(), fixes = []; let verts = 0, tris = 0, skinned = 0;
   scene.traverse((o) => {
     if (o.isBone) bones.push(o);
     if (o.isMesh) {
       meshes.push(o); if (o.isSkinnedMesh) skinned++;
       const g = o.geometry; verts += g.attributes.position.count; tris += (g.index ? g.index.count : g.attributes.position.count) / 3;
-      for (const m of [].concat(o.material)) { const k = m.name || "material_" + (mats.size + 1); if (!m.name) m.name = k; if (!mats.has(k)) mats.set(k, m); }
+      for (const m of [].concat(o.material)) {
+        const k = m.name || "material_" + (mats.size + 1); if (!m.name) m.name = k; if (mats.has(k)) continue; mats.set(k, m);
+        // FBX exports (Meshy/Mixamo) often carry a black diffuse colour that multiplies the texture to black, plus a bright specular.
+        if (m.map && m.color && m.color.r + m.color.g + m.color.b < 0.06) { m.color.set(0xffffff); fixes.push(`วัสดุ ${k}: สีพื้นเป็นดำทับ texture → แก้เป็นขาว`); }
+        if (m.map && m.specular && m.specular.r + m.specular.g + m.specular.b > 1.5) { m.specular.set(0x1a1a1a); fixes.push(`วัสดุ ${k}: ลดความเงา`); }
+      }
     }
   });
   const box = new THREE.Box3().setFromObject(scene);
   const depth = (b) => { let d = 0, p = b.parent; while (p) { d++; p = p.parent; } return d; };
   const boneList = bones.map((b) => ({ name: realName(b), node: b.name, depth: depth(b) }));
-  return { bones: boneList, boneObj: Object.fromEntries(bones.map((b) => [realName(b), b])), meshes, materials: [...mats.keys()], matObj: mats, verts, tris: Math.round(tris), skinned, box };
+  let tex = 0; for (const m of mats.values()) for (const t of [m.map, m.normalMap]) if (t && t.image) tex = Math.max(tex, t.image.width || 0);
+  return { fixes, tex, bones: boneList, boneObj: Object.fromEntries(bones.map((b) => [realName(b), b])), meshes, materials: [...mats.keys()], matObj: mats, verts, tris: Math.round(tris), skinned, box };
 }
 
 // Name heuristics for Mixamo, Blender/Rigify, VRoid, 3ds Max Biped and Godot-style names.
@@ -1283,9 +1289,12 @@ function secBody() {
   else if (c.status !== "ok") mid = `<div class="card"><h2>${esc(B.name)}</h2><p class="note">${c.status === "missing" ? "ไฟล์ของร่างนี้ไม่อยู่ในเบราว์เซอร์นี้ (เปิดจากเครื่องอื่นหรือล้างข้อมูลเว็บไปแล้ว) นำเข้าไฟล์ " + esc(B.file) + " อีกครั้งได้ ค่าที่ตั้งไว้จะใช้กับไฟล์ใหม่" : "เปิดไฟล์ไม่สำเร็จ: " + esc(c.error)}</p><label class="btn" for="body-file-re">นำเข้าไฟล์อีกครั้ง</label><input type="file" id="body-file-re" data-reimport="${B.id}" accept=".glb,.gltf,.vrm,.fbx" hidden> <button type="button" class="btn danger" data-act="body-del">ลบร่างนี้</button></div>`;
   else {
     const I = c.info, miss = bodyMissing(B), users = S.npcs.filter((n) => n.look.body === B.id).length;
+    for (const m of I.matObj.values()) for (const t of [m.map, m.normalMap]) if (t && t.image && t.image.width) I.tex = Math.max(I.tex, t.image.width);
     const boneOpts = (cur) => `<option value="">— ไม่มี —</option>` + I.bones.map((b) => `<option value="${esc(b.name)}"${b.name === cur ? " selected" : ""}>${esc("  ".repeat(Math.max(0, b.depth - I.bones[0].depth)) + b.name)}</option>`).join("");
     mid = `<div class="card"><h2>${esc(B.name)} <span class="muted" style="font-weight:400">· ${esc(B.file)}</span></h2>
-      <div class="chips"><span class="chip">${(B.size / 1048576).toFixed(1)} MB</span><span class="chip">${I.tris.toLocaleString()} สามเหลี่ยม</span><span class="chip${I.bones.length ? "" : " bad"}">กระดูก ${I.bones.length}</span><span class="chip${I.skinned ? "" : " bad"}">ผูกผิว ${I.skinned ? "✓" : "✗"}</span><span class="chip">ท่าในไฟล์ ${c.animations.length}</span><span class="chip">ใช้กับ NPC ${users}/${S.npcs.length}</span></div>
+      <div class="chips"><span class="chip">${(B.size / 1048576).toFixed(1)} MB</span><span class="chip${I.tris > 30000 ? " bad" : ""}">${I.tris.toLocaleString()} สามเหลี่ยม</span>${I.tex ? `<span class="chip${I.tex > 2048 ? " bad" : ""}">texture ${I.tex}px</span>` : ""}<span class="chip${I.bones.length ? "" : " bad"}">กระดูก ${I.bones.length}</span><span class="chip${I.skinned ? "" : " bad"}">ผูกผิว ${I.skinned ? "✓" : "✗"}</span><span class="chip">ท่าในไฟล์ ${c.animations.filter((a) => a.duration > 0.2).length}</span><span class="chip">ใช้กับ NPC ${users}/${S.npcs.length}</span></div>
+      ${I.tris > 30000 || I.tex > 2048 ? `<p class="note bad">หนักเกินไปสำหรับ NPC ที่อยู่พร้อมกันหลายตัว แนะนำลดเหลือราว 8,000–15,000 สามเหลี่ยม (Blender: Decimate) และ texture 1024–2048px ก่อนใช้ในเกม ตัวอย่างในหน้านี้ยังใช้ได้</p>` : ""}
+      ${I.fixes.length ? `<p class="note">แก้ให้อัตโนมัติ: ${esc(I.fixes.join(" · "))}</p>` : ""}
       <div class="fields"><label class="f">ชื่อร่าง<input type="text" id="body-${B.id}-name" data-body="name" value="${esc(B.name)}"></label>
       <div class="f">ทิศที่หันหน้า<div class="seg">${[0, 90, 180, 270].map((d) => `<button type="button" class="btn small" data-body-yaw="${d}" aria-pressed="${B.yaw === d}">${d}°</button>`).join("")}</div></div></div>
       <div class="row-actions"><button type="button" class="btn" data-act="body-all"${users === S.npcs.length ? " disabled" : ""}>ใช้ร่างนี้กับ NPC ทุกตัว</button><button type="button" class="btn danger" data-act="body-del">ลบร่างนี้</button></div>
@@ -1302,7 +1311,7 @@ function secBody() {
     </div>`;
   }
   const n = byId(S.npcs, ui.sel.look) || S.npcs[0];
-  const acts = [["walk", "เดิน"], ["work", "ทำงาน"], ["idle", "ยืน"]].concat((c.animations || []).map((a) => ["clip:" + (a.name || "clip"), "▶ " + (a.name || "clip")]));
+  const acts = [["walk", "เดิน"], ["work", "ทำงาน"], ["idle", "ยืน"]].concat((c.animations || []).filter((a) => a.duration > 0.2).map((a) => ["clip:" + (a.name || "clip"), "▶ " + (a.name || "clip")]));
   const right = `<div class="card preview" style="max-width:none"><div class="maptools">
       <label class="f" style="margin:0">ลองกับ<select id="body-try" data-body-try="1">${opts(S.npcs.map((x) => [x.id, x.name]), n && n.id)}</select></label>
       <div class="seg" role="group" aria-label="ท่าทาง">${acts.map(([k, l]) => `<button type="button" class="btn small" data-look3d="action:${esc(k)}" aria-pressed="${look3d.action === k}">${esc(l)}</button>`).join("")}</div>
