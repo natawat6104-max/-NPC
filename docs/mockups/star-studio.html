@@ -82,6 +82,14 @@ input[type=color] { min-height: 30px; padding: 2px; background: var(--bg); borde
 input[type=color]:disabled { opacity: 0.6; cursor: not-allowed; }
 .work > * { min-width: 0; }
 .tablewrap select { min-width: 96px; }
+.dropzone { display: grid; gap: 4px; margin-top: 10px; padding: 16px 12px; border: 1.5px dashed var(--line); border-radius: 10px; text-align: center; cursor: pointer; color: var(--muted); font-size: 0.8rem; }
+.dropzone b { color: var(--gold); font-size: 0.95rem; }
+.dropzone:hover, .dropzone.over, .dropzone:focus-within { border-color: var(--gold); background: rgba(227, 191, 99, 0.06); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 12px; color: var(--muted); }
+.chip.bad, .note.bad { color: var(--bad); }
+.bonemap { max-height: 380px; overflow: auto; }
+.bonemap tr.miss td:first-child { color: var(--bad); }
+.bonemap select { width: 100%; }
 .list { display: flex; flex-direction: column; gap: 4px; }
 .list .item { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; border: 1px solid transparent; background: transparent; border-radius: 8px; padding: 6px 10px; }
 .list .item:hover { background: var(--surface); }
@@ -200,6 +208,10 @@ canvas.chart { width: 100%; height: 170px; display: block; }
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/libs/fflate.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/FBXLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/SkeletonUtils.js"></script>
 <script>
 (() => {
 "use strict";
@@ -290,7 +302,7 @@ if (!S || !S.nodes) S = clone(DEFAULT);
 
 const ui = {
   sec: "overview",
-  sel: { look: "rena", npc: "rena", monster: "shadow_wolf", good: "medicine", quest: "gather", template: "party_returned", world: { kind: "node", id: "lumen" } },
+  sel: { look: "rena", body: null, npc: "rena", monster: "shadow_wolf", good: "medicine", quest: "gather", template: "party_returned", world: { kind: "node", id: "lumen" } },
   link: false, linkFrom: null, party: ["rena", "toma"],
   sc: { food: 1, info: 40, fatigue: 30, threat: 55 },
   stock: 9,
@@ -319,7 +331,7 @@ const EVENT_FIELDS = {
 const EVENT_NAMES = { party_returned: "ปาร์ตี้กลับจากภารกิจ", npc_injured: "NPC บาดเจ็บ", shortage_changed: "ระดับสต็อกเปลี่ยน", quest_posted: "มีภารกิจใหม่", omen_sent: "กลุ่มดาวส่งลาง" };
 const SECTIONS = [
   { grp: "โครงการ" }, { id: "overview", name: "ภาพรวม" },
-  { grp: "โลก" }, { id: "world", name: "แผนที่และเส้นทาง" }, { id: "npc", name: "ตัวละคร NPC" }, { id: "look", name: "รูปลักษณ์ตัวละคร" }, { id: "monster", name: "มอนสเตอร์" }, { id: "good", name: "สินค้าและราคา" },
+  { grp: "โลก" }, { id: "world", name: "แผนที่และเส้นทาง" }, { id: "npc", name: "ตัวละคร NPC" }, { id: "look", name: "รูปลักษณ์ตัวละคร" }, { id: "body", name: "ร่างพื้นฐาน 3D" }, { id: "monster", name: "มอนสเตอร์" }, { id: "good", name: "สินค้าและราคา" },
   { grp: "เรื่องราว" }, { id: "quest", name: "แม่แบบภารกิจ" }, { id: "crisis", name: "วิกฤตประจำบท" }, { id: "template", name: "แม่แบบพงศาวดาร" },
   { grp: "ระบบ" }, { id: "power", name: "พลังกลุ่มดาว" }, { id: "balance", name: "ตัวเลข Balance" }, { id: "sim", name: "ทดสอบจำลอง" },
 ];
@@ -388,7 +400,7 @@ function issues() {
   for (const q of S.quests) if (!nodeIds.has(q.dest)) out.push({ sec: "quest", id: q.id, msg: `${q.name}: จุดหมายไม่มีในแผนที่` });
   if (S.crisis.outcomes.length < 3) out.push({ sec: "crisis", msg: `วิกฤตต้องมีผลลัพธ์อย่างน้อย 3 แนวทาง (ตอนนี้มี ${S.crisis.outcomes.length})` });
   for (const t of S.templates) { const allowed = EVENT_FIELDS[t.event] || {}; const bad = [...t.text.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).filter((k) => !(k in allowed)); if (bad.length) out.push({ sec: "template", id: t.id, msg: `แม่แบบ ${t.id}: ใช้ช่องที่เหตุการณ์นี้ไม่มี {${bad.join("}, {")}}` }); }
-  out.push(...lookIssues());
+  out.push(...lookIssues(), ...bodyIssues());
   if (!S.goods.some((g) => g.id === "medicine")) out.push({ sec: "good", msg: "ไม่มีสินค้า 'ยา' (medicine) ซึ่งวิกฤตและระบบจำลองต้องใช้" });
   return out;
 }
@@ -396,7 +408,7 @@ function issues() {
 // ======================= nav + top =======================
 function renderNav() {
   const iss = issues(); const counts = {
-    world: `${S.nodes.length}·${S.routes.length}`, npc: S.npcs.length, look: S.npcs.length, monster: S.monsters.length, good: S.goods.length, quest: S.quests.length, crisis: S.crisis.outcomes.length + " ผล", template: S.templates.length, power: Object.keys(S.balance.powers).length,
+    world: `${S.nodes.length}·${S.routes.length}`, npc: S.npcs.length, look: S.npcs.length, body: S.bodies.length, monster: S.monsters.length, good: S.goods.length, quest: S.quests.length, crisis: S.crisis.outcomes.length + " ผล", template: S.templates.length, power: Object.keys(S.balance.powers).length,
   };
   $("#nav").innerHTML = SECTIONS.map((s) => {
     if (s.grp) return `<div class="grp">${s.grp}</div>`;
@@ -856,9 +868,10 @@ function randomLook(role) {
   return { hair, hairColor: pick(HAIR_COLORS), skin: pick(SKIN_TONES), outfit: R.outfit, hat: R.hat, prop: R.prop, beard: hair === "short" && Math.random() < 0.35, height: +(0.92 + Math.random() * 0.16).toFixed(2), build: +(0.9 + Math.random() * 0.22).toFixed(2), useRole: true, main: R.main, accent: R.accent };
 }
 function ensureLooks() {
+  if (!S.bodies) S.bodies = [];
   if (!S.rolePalette) S.rolePalette = clone(DEFAULT_ROLE_PALETTE);
   for (const r of ROLES) if (!S.rolePalette[r]) S.rolePalette[r] = clone(DEFAULT_ROLE_PALETTE[r]);
-  for (const n of S.npcs) if (!n.look) { const R = S.rolePalette[n.role] || {}; n.look = DEFAULT_LOOKS[n.id] ? { ...clone(DEFAULT_LOOKS[n.id]), useRole: true, main: R.main, accent: R.accent } : randomLook(n.role); }
+  for (const n of S.npcs) if (!n.look) { const R = S.rolePalette[n.role] || {}; n.look = DEFAULT_LOOKS[n.id] ? { ...clone(DEFAULT_LOOKS[n.id]), useRole: true, main: R.main, accent: R.accent } : randomLook(n.role); if (n.look.body === undefined) n.look.body = S.bodies[0]?.id || ""; }
 }
 function lookOf(n) { const L = n.look, R = S.rolePalette[n.role] || {}; return { ...L, main: L.useRole ? R.main || L.main : L.main, accent: L.useRole ? R.accent || L.accent : L.accent }; }
 const hexDist = (a, b) => { const p = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)); const x = p(a), y = p(b); return Math.hypot(x[0] - y[0], x[1] - y[1], x[2] - y[2]); };
@@ -907,6 +920,40 @@ function initLook3d() {
 const toonCache = {};
 function toon(color) { return toonCache[color] || (toonCache[color] = new THREE.MeshToonMaterial({ color })); }
 function part(geo, color) { const m = new THREE.Mesh(geo, toon(color)); m.castShadow = true; return m; }
+// Part builders shared by the placeholder chibi and imported bodies (hats, hair and props are attached to an imported body's bones).
+// Head group: head centre at y=0.48, radius 0.5. Torso group: pivot at the hips, shoulders at y≈0.46. Arm groups: pivot at the shoulder, hand at y=-0.38.
+function headParts(L, g, withHair) {
+  if (L.beard) { const b = part(new THREE.SphereGeometry(0.28, 14, 10), L.hairColor); b.scale.set(1.1, 0.7, 0.8); b.position.set(0, 0.22, 0.25); g.add(b); }
+  if (withHair) {
+    if (L.hair !== "bald" && L.hair !== "hood") {
+      const cap = part(new THREE.SphereGeometry(0.53, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.55), L.hairColor); cap.position.y = 0.5; cap.rotation.x = -0.25; g.add(cap);
+      const bangs = part(new THREE.SphereGeometry(0.5, 16, 8, -Math.PI * 0.45, Math.PI * 0.9, 0, Math.PI * 0.33), L.hairColor); bangs.position.set(0, 0.55, 0.06); g.add(bangs);
+    }
+    if (L.hair === "pony") { const p = part(new THREE.SphereGeometry(0.2, 12, 10), L.hairColor); p.scale.set(0.8, 1.5, 0.8); p.position.set(0, 0.55, -0.55); g.add(p); }
+    if (L.hair === "bun") { const b = part(new THREE.SphereGeometry(0.2, 12, 10), L.hairColor); b.position.set(0, 1.02, -0.12); g.add(b); }
+    if (L.hair === "long") { const b = part(new THREE.SphereGeometry(0.5, 16, 12), L.hairColor); b.scale.set(1.02, 1.15, 0.6); b.position.set(0, 0.3, -0.2); g.add(b); }
+    if (L.hair === "hood") { const h = part(new THREE.SphereGeometry(0.58, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.6), L.accent); h.position.y = 0.46; h.rotation.x = -0.45; g.add(h); }
+  }
+  if (L.hat === "straw") { const brim = part(new THREE.CylinderGeometry(0.78, 0.78, 0.04, 24), "#d9b65c"); brim.position.y = 0.86; g.add(brim); const top = part(new THREE.CylinderGeometry(0.34, 0.4, 0.24, 18), "#d9b65c"); top.position.y = 1.0; g.add(top); }
+  if (L.hat === "helmet") { const h = part(new THREE.SphereGeometry(0.56, 18, 10, 0, Math.PI * 2, 0, Math.PI * 0.5), "#9aa0ac"); h.position.y = 0.52; g.add(h); const brim = part(new THREE.CylinderGeometry(0.6, 0.6, 0.05, 20), "#7d8390"); brim.position.y = 0.55; g.add(brim); }
+  if (L.hat === "cap") { const h = part(new THREE.SphereGeometry(0.54, 18, 10, 0, Math.PI * 2, 0, Math.PI * 0.42), L.accent); h.position.y = 0.6; g.add(h); const v = part(new THREE.BoxGeometry(0.5, 0.04, 0.3), L.accent); v.position.set(0, 0.78, 0.5); g.add(v); }
+}
+function torsoParts(L, g, robe) {
+  const wood = "#8a6440";
+  if (L.outfit === "armor") for (const sx of [-0.3, 0.3]) { const pad = part(new THREE.SphereGeometry(0.15, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2), L.main); pad.position.set(sx, 0.46, 0); g.add(pad); }
+  if (L.outfit === "cloak") { const cape = part(new THREE.BoxGeometry(0.62, 0.62, 0.05), L.accent); cape.position.set(0, 0.2, -0.32); cape.rotation.x = 0.15; g.add(cape); }
+  if (L.prop === "pack") { const p = part(new THREE.BoxGeometry(0.4, 0.42, 0.22), L.accent); p.position.set(0, 0.3, -0.32); g.add(p); }
+  if (L.prop === "bow") { const b = new THREE.Mesh(new THREE.TorusGeometry(0.45, 0.03, 6, 16, Math.PI), toon(wood)); b.rotation.z = -Math.PI / 2; b.position.set(0, 0.3, -0.3); b.castShadow = true; g.add(b); }
+  if (L.prop === "apron") { const a = part(new THREE.BoxGeometry(0.42, robe ? 0.6 : 0.45, 0.04), L.accent); a.position.set(0, robe ? 0.05 : 0.18, robe ? 0.34 : 0.3); a.rotation.x = robe ? -0.2 : 0; g.add(a); }
+  if (L.prop === "bag") { const b = part(new THREE.BoxGeometry(0.25, 0.25, 0.12), L.accent); b.position.set(-0.38, 0.05, 0.05); g.add(b); }
+}
+function handParts(L, armR, armL) {
+  const wood = "#8a6440", metal = "#7d8390";
+  if (L.prop === "hammer") { const h = part(new THREE.CylinderGeometry(0.03, 0.03, 0.5, 6), wood); h.position.set(0, -0.45, 0.12); h.rotation.x = Math.PI / 2; armR.add(h); const hd = part(new THREE.BoxGeometry(0.16, 0.14, 0.24), metal); hd.position.set(0, -0.45, 0.38); armR.add(hd); }
+  if (L.prop === "hoe") { const h = part(new THREE.CylinderGeometry(0.03, 0.03, 1.3, 6), wood); h.position.set(0, -0.38, 0); armR.add(h); const bl = part(new THREE.BoxGeometry(0.22, 0.05, 0.16), metal); bl.position.set(0, 0.26, 0.08); armR.add(bl); }
+  if (L.prop === "spear") { const h = part(new THREE.CylinderGeometry(0.03, 0.03, 1.7, 6), wood); h.position.set(0, -0.2, 0); armR.add(h); const tip = part(new THREE.ConeGeometry(0.06, 0.2, 8), metal); tip.position.set(0, 0.75, 0); armR.add(tip); }
+  if (L.prop === "lantern") { const l = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.2, 0.16), new THREE.MeshLambertMaterial({ color: 0xffe2a0, emissive: 0xffc670, emissiveIntensity: 0.8 })); l.position.set(0, -0.55, 0.06); armL.add(l); }
+}
 function buildChibi(L) {
   const root = new THREE.Group(), r = { root }; const pv = (x, y, z) => { const g = new THREE.Group(); g.position.set(x, y, z); return g; };
   const robe = L.outfit === "robe";
@@ -916,37 +963,17 @@ function buildChibi(L) {
   const bodyColor = L.outfit === "armor" ? L.accent : L.main;
   const body = part(robe ? new THREE.CylinderGeometry(0.25, 0.42, 0.8, 16) : new THREE.CylinderGeometry(0.26, 0.34, 0.5, 14), bodyColor); body.position.y = robe ? 0.1 : 0.25; r.torso.add(body);
   const belt = part(new THREE.CylinderGeometry(robe ? 0.3 : 0.31, robe ? 0.3 : 0.31, 0.07, 14), L.outfit === "armor" ? L.main : L.accent); belt.position.y = robe ? 0.2 : 0.1; r.torso.add(belt);
-  if (L.outfit === "armor") for (const sx of [-0.3, 0.3]) { const pad = part(new THREE.SphereGeometry(0.15, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2), L.main); pad.position.set(sx, 0.46, 0); r.torso.add(pad); }
-  if (L.outfit === "cloak") { const cape = part(new THREE.BoxGeometry(0.62, 0.62, 0.05), L.accent); cape.position.set(0, 0.2, -0.32); cape.rotation.x = 0.15; r.torso.add(cape); }
+  torsoParts(L, r.torso, robe);
   r.head = pv(0, 0.5, 0); r.torso.add(r.head);
   const head = part(new THREE.SphereGeometry(0.5, 20, 16), L.skin); head.position.y = 0.48; r.head.add(head);
   for (const sx of [-0.17, 0.17]) {
     const eye = part(new THREE.SphereGeometry(0.06, 10, 8), "#1d1a24"); eye.scale.set(0.8, 1.25, 0.5); eye.position.set(sx, 0.48, 0.46); r.head.add(eye);
     const blush = part(new THREE.SphereGeometry(0.06, 10, 8), "#f2a0a0"); blush.scale.set(1.2, 0.6, 0.3); blush.position.set(sx * 1.45, 0.36, 0.42); r.head.add(blush);
   }
-  if (L.beard) { const b = part(new THREE.SphereGeometry(0.28, 14, 10), L.hairColor); b.scale.set(1.1, 0.7, 0.8); b.position.set(0, 0.22, 0.25); r.head.add(b); }
-  if (L.hair !== "bald" && L.hair !== "hood") {
-    const cap = part(new THREE.SphereGeometry(0.53, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.55), L.hairColor); cap.position.y = 0.5; cap.rotation.x = -0.25; r.head.add(cap);
-    const bangs = part(new THREE.SphereGeometry(0.5, 16, 8, -Math.PI * 0.45, Math.PI * 0.9, 0, Math.PI * 0.33), L.hairColor); bangs.position.set(0, 0.55, 0.06); r.head.add(bangs);
-  }
-  if (L.hair === "pony") { const p = part(new THREE.SphereGeometry(0.2, 12, 10), L.hairColor); p.scale.set(0.8, 1.5, 0.8); p.position.set(0, 0.55, -0.55); r.head.add(p); }
-  if (L.hair === "bun") { const b = part(new THREE.SphereGeometry(0.2, 12, 10), L.hairColor); b.position.set(0, 1.02, -0.12); r.head.add(b); }
-  if (L.hair === "long") { const b = part(new THREE.SphereGeometry(0.5, 16, 12), L.hairColor); b.scale.set(1.02, 1.15, 0.6); b.position.set(0, 0.3, -0.2); r.head.add(b); }
-  if (L.hair === "hood") { const h = part(new THREE.SphereGeometry(0.58, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.6), L.accent); h.position.y = 0.46; h.rotation.x = -0.45; r.head.add(h); }
-  if (L.hat === "straw") { const brim = part(new THREE.CylinderGeometry(0.78, 0.78, 0.04, 24), "#d9b65c"); brim.position.y = 0.86; r.head.add(brim); const top = part(new THREE.CylinderGeometry(0.34, 0.4, 0.24, 18), "#d9b65c"); top.position.y = 1.0; r.head.add(top); }
-  if (L.hat === "helmet") { const h = part(new THREE.SphereGeometry(0.56, 18, 10, 0, Math.PI * 2, 0, Math.PI * 0.5), "#9aa0ac"); h.position.y = 0.52; r.head.add(h); const brim = part(new THREE.CylinderGeometry(0.6, 0.6, 0.05, 20), "#7d8390"); brim.position.y = 0.55; r.head.add(brim); }
-  if (L.hat === "cap") { const h = part(new THREE.SphereGeometry(0.54, 18, 10, 0, Math.PI * 2, 0, Math.PI * 0.42), L.accent); h.position.y = 0.6; r.head.add(h); const v = part(new THREE.BoxGeometry(0.5, 0.04, 0.3), L.accent); v.position.set(0, 0.78, 0.5); r.head.add(v); }
+  headParts(L, r.head, true);
   r.armL = pv(-0.33, 0.44, 0); r.armR = pv(0.33, 0.44, 0);
   for (const g of [r.armL, r.armR]) { const a = part(new THREE.CylinderGeometry(0.08, 0.08, 0.36, 10), bodyColor); a.position.y = -0.18; g.add(a); const hand = part(new THREE.SphereGeometry(0.09, 10, 8), L.skin); hand.position.y = -0.38; g.add(hand); r.torso.add(g); }
-  const wood = "#8a6440", metal = "#7d8390";
-  if (L.prop === "pack") { const p = part(new THREE.BoxGeometry(0.4, 0.42, 0.22), L.accent); p.position.set(0, 0.3, -0.32); r.torso.add(p); }
-  if (L.prop === "bow") { const b = new THREE.Mesh(new THREE.TorusGeometry(0.45, 0.03, 6, 16, Math.PI), toon(wood)); b.rotation.z = -Math.PI / 2; b.position.set(0, 0.3, -0.3); b.castShadow = true; r.torso.add(b); }
-  if (L.prop === "apron") { const a = part(new THREE.BoxGeometry(0.42, robe ? 0.6 : 0.45, 0.04), L.accent); a.position.set(0, robe ? 0.05 : 0.18, robe ? 0.34 : 0.3); a.rotation.x = robe ? -0.2 : 0; r.torso.add(a); }
-  if (L.prop === "bag") { const b = part(new THREE.BoxGeometry(0.25, 0.25, 0.12), L.accent); b.position.set(-0.38, 0.05, 0.05); r.torso.add(b); }
-  if (L.prop === "hammer") { const h = part(new THREE.CylinderGeometry(0.03, 0.03, 0.5, 6), wood); h.position.set(0, -0.45, 0.12); h.rotation.x = Math.PI / 2; r.armR.add(h); const hd = part(new THREE.BoxGeometry(0.16, 0.14, 0.24), metal); hd.position.set(0, -0.45, 0.38); r.armR.add(hd); }
-  if (L.prop === "hoe") { const h = part(new THREE.CylinderGeometry(0.03, 0.03, 1.3, 6), wood); h.position.set(0, -0.38, 0); r.armR.add(h); const bl = part(new THREE.BoxGeometry(0.22, 0.05, 0.16), metal); bl.position.set(0, 0.26, 0.08); r.armR.add(bl); }
-  if (L.prop === "spear") { const h = part(new THREE.CylinderGeometry(0.03, 0.03, 1.7, 6), wood); h.position.set(0, -0.2, 0); r.armR.add(h); const tip = part(new THREE.ConeGeometry(0.06, 0.2, 8), metal); tip.position.set(0, 0.75, 0); r.armR.add(tip); }
-  if (L.prop === "lantern") { const l = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.2, 0.16), new THREE.MeshLambertMaterial({ color: 0xffe2a0, emissive: 0xffc670, emissiveIntensity: 0.8 })); l.position.set(0, -0.55, 0.06); r.armL.add(l); }
+  handParts(L, r.armR, r.armL);
   root.scale.set(L.build, L.height, L.build);
   return r;
 }
@@ -955,37 +982,361 @@ function syncRigs() {
   const alive = new Set(S.npcs.map((n) => n.id));
   for (const id of Object.keys(look3d.rigs)) if (!alive.has(id)) { look3d.scene.remove(look3d.rigs[id].root); delete look3d.rigs[id]; delete look3d.sig[id]; }
   S.npcs.forEach((n, i) => {
-    const L = lookOf(n), sig = JSON.stringify(L);
-    if (look3d.sig[n.id] !== sig) { if (look3d.rigs[n.id]) look3d.scene.remove(look3d.rigs[n.id].root); const r = buildChibi(L); r.root.traverse((o) => { o.userData.npc = n.id; }); r.root.userData.npc = n.id; r.phase = i * 1.1; look3d.scene.add(r.root); look3d.rigs[n.id] = r; look3d.sig[n.id] = sig; }
+    const L = lookOf(n), sig = rigSig(n, L);
+    if (look3d.sig[n.id] !== sig) { if (look3d.rigs[n.id]) look3d.scene.remove(look3d.rigs[n.id].root); const r = buildRig(n, L); r.root.traverse((o) => { o.userData.npc = n.id; }); r.root.userData.npc = n.id; r.phase = i * 1.1; look3d.scene.add(r.root); look3d.rigs[n.id] = r; look3d.sig[n.id] = sig; }
   });
+}
+// ======================= imported base bodies (rigged models) =======================
+// The file itself stays in this browser (IndexedDB); S.bodies keeps only settings, so the JSON export stays small.
+// Bone slots use Godot's SkeletonProfileHumanoid names so the map can be reused as a BoneMap when importing into Godot.
+const HUMANOID = [
+  ["Hips", "สะโพก", 1], ["Spine", "กระดูกสันหลัง", 1], ["Chest", "อก", 0], ["UpperChest", "อกบน", 0], ["Neck", "คอ", 0], ["Head", "หัว", 1],
+  ["LeftShoulder", "ไหล่ซ้าย", 0], ["LeftUpperArm", "ต้นแขนซ้าย", 1], ["LeftLowerArm", "แขนท่อนล่างซ้าย", 1], ["LeftHand", "มือซ้าย", 1],
+  ["RightShoulder", "ไหล่ขวา", 0], ["RightUpperArm", "ต้นแขนขวา", 1], ["RightLowerArm", "แขนท่อนล่างขวา", 1], ["RightHand", "มือขวา", 1],
+  ["LeftUpperLeg", "ต้นขาซ้าย", 1], ["LeftLowerLeg", "หน้าแข้งซ้าย", 1], ["LeftFoot", "เท้าซ้าย", 1], ["LeftToes", "นิ้วเท้าซ้าย", 0],
+  ["RightUpperLeg", "ต้นขาขวา", 1], ["RightLowerLeg", "หน้าแข้งขวา", 1], ["RightFoot", "เท้าขวา", 1], ["RightToes", "นิ้วเท้าขวา", 0],
+];
+const MAT_SLOTS = { keep: "คงสีเดิมของโมเดล", skin: "ผิว", hair: "ผม", main: "ชุด สีหลัก", accent: "ชุด สีรอง" };
+const BODY_HEIGHT = 1.9; // scene units, same as the placeholder chibi
+const bodyCache = {};
+const body3d = { bones: false };
+
+const modelStore = {
+  open() { return new Promise((res, rej) => { const r = indexedDB.open("star-studio", 1); r.onupgradeneeded = () => r.result.createObjectStore("models"); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); },
+  async put(k, v) { try { const db = await this.open(); await new Promise((res, rej) => { const t = db.transaction("models", "readwrite"); t.objectStore("models").put(v, k); t.oncomplete = res; t.onerror = () => rej(t.error); }); return true; } catch (e) { return false; } },
+  async get(k) { try { const db = await this.open(); return await new Promise((res, rej) => { const q = db.transaction("models").objectStore("models").get(k); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); }); } catch (e) { return null; } },
+  async del(k) { try { const db = await this.open(); db.transaction("models", "readwrite").objectStore("models").delete(k); } catch (e) {} },
+};
+
+function parseModel(buf, fileName) {
+  const ext = fileName.split(".").pop().toLowerCase();
+  return new Promise((res, rej) => {
+    try {
+      if (ext === "fbx") { if (!THREE.FBXLoader) throw new Error("โหลดตัวอ่าน FBX ไม่สำเร็จ"); const g = new THREE.FBXLoader().parse(buf, ""); res({ scene: g, animations: g.animations || [] }); }
+      else { if (!THREE.GLTFLoader) throw new Error("โหลดตัวอ่าน glTF ไม่สำเร็จ"); new THREE.GLTFLoader().parse(buf, "", (g) => res({ scene: g.scene, animations: g.animations || [] }), (e) => rej(new Error(ext === "gltf" ? "ไฟล์ .gltf ที่แยกไฟล์ .bin/texture ไว้ต่างหากเปิดไม่ได้ ให้ส่งออกเป็น .glb ไฟล์เดียว" : (e && e.message) || "อ่านไฟล์ไม่สำเร็จ"))); }
+    } catch (e) { rej(e); }
+  });
+}
+const realName = (o) => o.userData.name || o.name;
+function analyzeModel(scene) {
+  scene.updateMatrixWorld(true);
+  const bones = [], meshes = [], mats = new Map(); let verts = 0, tris = 0, skinned = 0;
+  scene.traverse((o) => {
+    if (o.isBone) bones.push(o);
+    if (o.isMesh) {
+      meshes.push(o); if (o.isSkinnedMesh) skinned++;
+      const g = o.geometry; verts += g.attributes.position.count; tris += (g.index ? g.index.count : g.attributes.position.count) / 3;
+      for (const m of [].concat(o.material)) { const k = m.name || "material_" + (mats.size + 1); if (!m.name) m.name = k; if (!mats.has(k)) mats.set(k, m); }
+    }
+  });
+  const box = new THREE.Box3().setFromObject(scene);
+  const depth = (b) => { let d = 0, p = b.parent; while (p) { d++; p = p.parent; } return d; };
+  const boneList = bones.map((b) => ({ name: realName(b), node: b.name, depth: depth(b) }));
+  return { bones: boneList, boneObj: Object.fromEntries(bones.map((b) => [realName(b), b])), meshes, materials: [...mats.keys()], matObj: mats, verts, tris: Math.round(tris), skinned, box };
+}
+
+// Name heuristics for Mixamo, Blender/Rigify, VRoid, 3ds Max Biped and Godot-style names.
+function boneCore(name) {
+  const s = name.toLowerCase().replace(/^.*[:|]/, "").replace(/^(mixamorig\d*|armature[_.]?|def[-_.]|j_bip_|bip0?1[_ ]?|b_)/, "");
+  const side = /^left|left$|(^|[_.\- ])l([_.\- ]|$)|[a-z]l$/.test(s) && !/(^|[^a-z])(ball|pelvis|tail)$/.test(s) ? "L" : /^right|right$|(^|[_.\- ])r([_.\- ]|$)/.test(s) ? "R" : "";
+  let core = s.replace(/left|right/g, "").replace(/(^|[_.\- ])[lr](?=[_.\- ]|$)/g, "$1").replace(/[_.\- ]+/g, "");
+  return { side, core, raw: s };
+}
+function autoMapBones(info) {
+  const skip = /twist|roll|ik|pole|ctrl|target|helper|end$|nub|top|tip|^org|^mch|thumb|index|middle|ring|pinky|little|finger|eye|jaw|tongue|hair|bust|breast|skirt/;
+  const list = info.bones.map((b) => ({ ...b, ...boneCore(b.name) })).filter((b) => !skip.test(b.core)).sort((a, b) => a.depth - b.depth);
+  // Names like "upper_arml" lose their side marker when sanitized; trust an explicit trailing l/r only if it is a known core.
+  for (const b of list) if (!b.side) { const m = b.core.match(/^(upperarm|forearm|lowerarm|hand|thigh|shin|foot|toe|shoulder|clavicle|upperleg|lowerleg|arm|leg|upleg)([lr])$/); if (m) { b.side = m[2].toUpperCase(); b.core = m[1]; } }
+  const find = (re, side) => list.find((b) => b.side === side && re.test(b.core));
+  const map = {};
+  map.Hips = (find(/^(hips?|pelvis|root?hips)$/, "") || find(/hip|pelvis/, "") || {}).name;
+  const spines = list.filter((b) => !b.side && /spine|chest|torso|abdomen/.test(b.core) && !/neck|head/.test(b.core));
+  if (spines[0]) map.Spine = spines[0].name; if (spines[1]) map.Chest = spines[1].name; if (spines[2]) map.UpperChest = spines[2].name;
+  map.Neck = (find(/neck/, "") || {}).name;
+  map.Head = (find(/^head$|^head\d*$/, "") || find(/head/, "") || {}).name;
+  for (const [side, P] of [["L", "Left"], ["R", "Right"]]) {
+    map[P + "Shoulder"] = (find(/shoulder|clavicle|collar/, side) || {}).name;
+    map[P + "UpperArm"] = (find(/^(upperarm|uparm|arm|arm0*1)$/, side) || find(/upperarm/, side) || {}).name;
+    map[P + "LowerArm"] = (find(/forearm|lowerarm|elbow|^arm0*2$/, side) || {}).name;
+    map[P + "Hand"] = (find(/^(hand|wrist)$/, side) || find(/hand|wrist/, side) || {}).name;
+    map[P + "UpperLeg"] = (find(/upleg|upperleg|thigh|^leg0*1$/, side) || {}).name;
+    map[P + "LowerLeg"] = (find(/^(leg|lowerleg|calf|shin|knee|leg0*2)$/, side) || find(/calf|shin|lowerleg/, side) || {}).name;
+    map[P + "Foot"] = (find(/^(foot|ankle)$/, side) || find(/foot|ankle/, side) || {}).name;
+    map[P + "Toes"] = (find(/toe/, side) || {}).name;
+  }
+  for (const k of Object.keys(map)) if (!map[k]) delete map[k];
+  return map;
+}
+function guessMatSlot(name) {
+  const s = name.toLowerCase();
+  if (/hair|kami/.test(s)) return "hair";
+  if (/skin|body|face|head|hada/.test(s)) return "skin";
+  if (/pant|skirt|shoe|boot|belt|trouser|leg/.test(s)) return "accent";
+  if (/cloth|shirt|dress|outfit|top|robe|tunic|fuku|coat|jacket/.test(s)) return "main";
+  return "keep";
+}
+function guessYaw(info, map) {
+  const L = info.boneObj[map.LeftUpperArm], R = info.boneObj[map.RightUpperArm]; if (!L || !R) return 0;
+  const a = L.getWorldPosition(new THREE.Vector3()), b = R.getWorldPosition(new THREE.Vector3());
+  const deg = (Math.atan2(a.z - b.z, a.x - b.x) * 180) / Math.PI; return ((Math.round(deg / 90) * 90) % 360 + 360) % 360;
+}
+function bodyMissing(B) { return HUMANOID.filter(([k, , req]) => req && !(B.boneMap[k] && bodyCache[B.id]?.info?.boneObj[B.boneMap[k]])).map(([k, l]) => l); }
+function bodyIssues() {
+  const out = [];
+  for (const B of S.bodies) {
+    const c = bodyCache[B.id]; if (!c || c.status !== "ok") continue;
+    if (!c.info.bones.length) { out.push({ sec: "body", id: B.id, msg: `${B.name}: โมเดลนี้ไม่มีกระดูก ต้องใส่กระดูก (rig) ก่อนส่งออก` }); continue; }
+    const miss = bodyMissing(B); if (miss.length) out.push({ sec: "body", id: B.id, msg: `${B.name}: ยังไม่ได้จับคู่กระดูก ${miss.join(", ")}` });
+    if (!c.info.skinned) out.push({ sec: "body", id: B.id, msg: `${B.name}: ตัวโมเดลไม่ได้ผูกกับกระดูก (ไม่มี skin) ขยับกระดูกแล้วตัวจะไม่ขยับตาม` });
+  }
+  return out;
+}
+
+const comp = (a, i, k) => (k === 0 ? a.getX(i) : k === 1 ? a.getY(i) : k === 2 ? a.getZ(i) : a.getW(i));
+// Rest-pose geometry used to place hats, hair and props: head centre/size, torso size, shoulder height. In model units.
+function bodyGeom(B) {
+  const c = bodyCache[B.id], key = JSON.stringify(B.boneMap); if (c.geomKey === key) return c.geom;
+  const I = c.info, bo = (k) => I.boneObj[B.boneMap[k]], wp = (o) => o.getWorldPosition(new THREE.Vector3());
+  const subtree = (b) => { const s = new Set(); if (b) b.traverse((o) => s.add(o)); return s; };
+  const headSet = subtree(bo("Head")), torsoSet = new Set(["Spine", "Chest", "UpperChest"].map(bo).filter(Boolean));
+  const hb = new THREE.Box3(), tb = new THREE.Box3(), v = new THREE.Vector3();
+  for (const m of I.meshes) {
+    if (!m.isSkinnedMesh) { let p = m.parent, inHead = false; while (p) { if (headSet.has(p)) { inHead = true; break; } p = p.parent; } if (inHead) hb.expandByObject(m); continue; }
+    const pos = m.geometry.attributes.position, si = m.geometry.attributes.skinIndex, sw = m.geometry.attributes.skinWeight; if (!si || !sw) continue;
+    const bones = m.skeleton.bones, step = Math.max(1, Math.floor(pos.count / 40000));
+    for (let i = 0; i < pos.count; i += step) {
+      let best = 0, bi = 0; for (let k = 0; k < 4; k++) { const w = comp(sw, i, k); if (w > best) { best = w; bi = comp(si, i, k); } }
+      const b = bones[bi]; if (!b) continue; const inH = headSet.has(b), inT = torsoSet.has(b); if (!inH && !inT) continue;
+      v.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld); (inH ? hb : tb).expandByPoint(v);
+    }
+  }
+  const H = I.box.max.y - I.box.min.y, head = bo("Head") ? wp(bo("Head")) : new THREE.Vector3(0, I.box.max.y - H * 0.08, 0);
+  const g = {};
+  if (hb.isEmpty()) { g.headC = head.clone().add(new THREE.Vector3(0, H * 0.06, 0)); g.headR = H * 0.07; }
+  else { g.headC = hb.getCenter(new THREE.Vector3()); const s = hb.getSize(new THREE.Vector3()); g.headR = Math.max(s.x, s.z) / 2; }
+  const hips = bo("Hips") ? wp(bo("Hips")) : new THREE.Vector3(0, I.box.min.y + H * 0.5, 0);
+  const sh = [bo("LeftUpperArm"), bo("RightUpperArm")].filter(Boolean).map(wp); const shY = sh.length ? sh.reduce((a, p) => a + p.y, 0) / sh.length : hips.y + H * 0.28;
+  if (tb.isEmpty()) { g.torsoW = H * 0.09; g.torsoD = H * 0.07; } else { const s = tb.getSize(new THREE.Vector3()); g.torsoW = s.x / 2; g.torsoD = s.z / 2; }
+  g.hips = hips; g.shY = shY; c.geom = g; c.geomKey = key; return g;
+}
+
+async function loadBody(B, buf) {
+  const c = (bodyCache[B.id] = { status: "loading" });
+  try {
+    if (!buf) buf = await modelStore.get(B.id);
+    if (!buf) { c.status = "missing"; return c; }
+    const { scene, animations } = await parseModel(buf, B.file);
+    Object.assign(c, { status: "ok", scene, animations, info: analyzeModel(scene) });
+  } catch (e) { c.status = "error"; c.error = e.message || String(e); }
+  return c;
+}
+async function importBodyFile(file) {
+  if (!look3d.ok) { toast("โหลดระบบ 3D ไม่สำเร็จ"); return; }
+  if (!/\.(glb|gltf|vrm|fbx)$/i.test(file.name)) { toast("รองรับไฟล์ .glb .gltf .vrm .fbx"); return; }
+  const buf = await file.arrayBuffer(); const id = newId("body", S.bodies);
+  const B = { id, name: file.name.replace(/\.[^.]+$/, ""), file: file.name, size: file.size, yaw: 0, boneMap: {}, matSlots: {}, hairMode: "model", toon: false, attach: { head: 1, headY: 0, prop: 1 } };
+  toast("กำลังอ่าน " + file.name + " …");
+  const c = await loadBody(B, buf);
+  if (c.status !== "ok") { toast("เปิดไฟล์ไม่สำเร็จ: " + (c.error || "")); delete bodyCache[id]; return; }
+  B.boneMap = autoMapBones(c.info); B.yaw = guessYaw(c.info, B.boneMap);
+  for (const m of c.info.materials) B.matSlots[m] = guessMatSlot(m);
+  if (c.info.materials.some((m) => B.matSlots[m] === "hair")) B.hairMode = "model"; else B.hairMode = "parts";
+  B.clips = c.animations.map((a) => a.name || "clip");
+  S.bodies.push(B); ui.sel.body = id;
+  if (S.bodies.length === 1) for (const n of S.npcs) n.look.body = id; // first body becomes everyone's base body
+  const stored = await modelStore.put(id, buf);
+  if (!stored) toast("เก็บไฟล์ในเบราว์เซอร์นี้ไม่ได้ ต้องนำเข้าใหม่เมื่อเปิดหน้าอีกครั้ง");
+  else toast(`นำเข้า ${B.name} แล้ว · กระดูก ${c.info.bones.length} ชิ้น`);
+  save(); render();
+}
+
+async function reimportBody(id, file) {
+  const B = byId(S.bodies, id); if (!B) return; const buf = await file.arrayBuffer(); B.file = file.name; B.size = file.size;
+  const c = await loadBody(B, buf); if (c.status !== "ok") { toast("เปิดไฟล์ไม่สำเร็จ: " + (c.error || "")); render(); return; }
+  B.boneMap = { ...autoMapBones(c.info), ...Object.fromEntries(Object.entries(B.boneMap).filter(([, v]) => c.info.boneObj[v])) };
+  for (const m of c.info.materials) if (!B.matSlots[m]) B.matSlots[m] = guessMatSlot(m);
+  B.clips = c.animations.map((a) => a.name || "clip"); await modelStore.put(id, buf); toast("นำเข้าอีกครั้งแล้ว"); save(); render();
+}
+
+// ---- rig built from an imported body ----
+const AX = window.THREE ? new THREE.Vector3(1, 0, 0) : null, AY = window.THREE ? new THREE.Vector3(0, 1, 0) : null;
+function bodyMaterial(m, slot, L, B, skinned) {
+  const col = { skin: L.skin, hair: L.hairColor, main: L.outfit === "armor" ? L.accent : L.main, accent: L.outfit === "armor" ? L.main : L.accent }[slot];
+  let out;
+  if (B.toon) { out = new THREE.MeshToonMaterial({ color: m.color ? m.color.clone() : 0xffffff, map: m.map || null, transparent: m.transparent, alphaTest: m.alphaTest, side: m.side, opacity: m.opacity }); out.skinning = skinned; out.morphTargets = !!m.morphTargets; }
+  else out = m.clone();
+  if (col && out.color) out.color.set(col);
+  if (slot === "hair" && B.hairMode === "parts") out.visible = false;
+  return out;
+}
+function buildImported(L, B) {
+  const c = bodyCache[B.id], I = c.info, g = bodyGeom(B);
+  const root = new THREE.Group(), wrap = new THREE.Group(), model = THREE.SkeletonUtils.clone(c.scene);
+  const H = I.box.max.y - I.box.min.y || 1, norm = BODY_HEIGHT / H, ctr = I.box.getCenter(new THREE.Vector3());
+  model.position.set(-ctr.x, -I.box.min.y, -ctr.z); wrap.add(model); wrap.scale.setScalar(norm); wrap.rotation.y = (B.yaw * Math.PI) / 180; root.add(wrap);
+  const matCache = new Map();
+  model.traverse((o) => {
+    if (!o.isMesh) return; o.castShadow = true; o.frustumCulled = false;
+    const conv = (m) => { const k = m.uuid; if (!matCache.has(k)) matCache.set(k, bodyMaterial(m, B.matSlots[m.name] || "keep", L, B, !!o.isSkinnedMesh)); return matCache.get(k); };
+    o.material = Array.isArray(o.material) ? o.material.map(conv) : conv(o.material);
+  });
+  root.updateMatrixWorld(true);
+  const byNode = {}; model.traverse((o) => { if (o.isBone) byNode[o.name] = o; });
+  const nodeOf = Object.fromEntries(I.bones.map((b) => [b.name, b.node]));
+  const r = { root, imported: true, model, b: {} };
+  const rootInv = root.getWorldQuaternion(new THREE.Quaternion()).invert();
+  for (const [slot] of HUMANOID) {
+    const bone = byNode[nodeOf[B.boneMap[slot]]]; if (!bone) continue;
+    const P = bone.parent.getWorldQuaternion(new THREE.Quaternion()).premultiply(rootInv);
+    r.b[slot] = { bone, rest: bone.quaternion.clone(), P, Pinv: P.clone().invert() };
+  }
+  const toRoot = (p) => model.localToWorld(p.clone()); // template model space -> rig space (root is at identity here)
+  const wpos = (slot) => r.b[slot].bone.getWorldPosition(new THREE.Vector3());
+  // Arms in the file are usually in T/A-pose: compute the rotation that lets them hang down.
+  r.down = {};
+  for (const [side, sx] of [["Left", 1], ["Right", -1]]) {
+    const end = r.b[side + "Hand"] ? side + "Hand" : side + "LowerArm"; if (!r.b[side + "UpperArm"] || !r.b[end]) continue;
+    const dir = wpos(end).sub(wpos(side + "UpperArm")).normalize();
+    r.down[side] = new THREE.Quaternion().setFromUnitVectors(dir, new THREE.Vector3(sx * 0.22, -1, 0.04).normalize());
+  }
+  // Attachments: same part builders as the chibi, scaled to this body.
+  const A = B.attach || { head: 1, headY: 0, prop: 1 }, swap = Math.abs(Math.sin((B.yaw * Math.PI) / 180)) > 0.5;
+  if (r.b.Head) {
+    const hc = toRoot(g.headC), s = ((g.headR * norm) / 0.5) * A.head, grp = new THREE.Group();
+    grp.position.set(hc.x, hc.y - 0.48 * s + A.headY * 0.1, hc.z); grp.scale.setScalar(s); headParts(L, grp, B.hairMode === "parts"); root.add(grp); r.b.Head.bone.attach(grp);
+  }
+  const chest = r.b.UpperChest || r.b.Chest || r.b.Spine;
+  if (chest) {
+    // Uneven scale lives on an inner group so attaching to a rotated bone does not shear it.
+    const hp = toRoot(g.hips), shY = toRoot(new THREE.Vector3(g.hips.x, g.shY, g.hips.z)).y, outer = new THREE.Group(), grp = new THREE.Group();
+    const w = (swap ? g.torsoD : g.torsoW) * norm, d = (swap ? g.torsoW : g.torsoD) * norm;
+    outer.position.copy(hp); grp.scale.set(Math.max(w, 0.05) / 0.3, Math.max(shY - hp.y, 0.1) / 0.46, Math.max(d, 0.05) / 0.3); torsoParts(L, grp, false); outer.add(grp); root.add(outer); chest.bone.attach(outer);
+  }
+  for (const [side, key] of [["Right", "armR"], ["Left", "armL"]]) {
+    const hand = r.b[side + "Hand"], up = r.b[side + "UpperArm"]; if (!hand || !up) continue;
+    const hp = wpos(side + "Hand"), dir = hp.clone().sub(wpos(side + "UpperArm")).normalize(), grp = new THREE.Group();
+    grp.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), dir); grp.scale.setScalar(A.prop);
+    grp.position.copy(hp).sub(new THREE.Vector3(0, -0.38 * A.prop, 0).applyQuaternion(grp.quaternion)); root.add(grp); r[key] = grp;
+  }
+  if (r.armR || r.armL) handParts(L, r.armR || new THREE.Group(), r.armL || new THREE.Group());
+  for (const [side, key] of [["Right", "armR"], ["Left", "armL"]]) if (r[key]) r.b[side + "Hand"].bone.attach(r[key]);
+  if (c.animations.length) { r.mixer = new THREE.AnimationMixer(model); r.clips = c.animations; }
+  root.scale.set(L.build, L.height, L.build);
+  return r;
+}
+function setBone(r, slot, R) { const b = r.b[slot]; if (!b) return; b.bone.quaternion.copy(b.Pinv).multiply(R).multiply(b.P).multiply(b.rest); }
+function restBone(r, slot) { const b = r.b[slot]; if (b) b.bone.quaternion.copy(b.rest); }
+function animImported(r, act, p, dt) {
+  if (act.startsWith("clip:")) {
+    const name = act.slice(5); if (r.mixer) { if (r.playing !== name) { r.mixer.stopAllAction(); for (const k of Object.keys(r.b)) restBone(r, k); const clip = r.clips.find((c) => (c.name || "clip") === name); if (clip) r.mixer.clipAction(clip).play(); r.playing = name; } r.mixer.update(dt); }
+    return;
+  }
+  if (r.playing) { r.mixer.stopAllAction(); r.playing = null; }
+  for (const k of Object.keys(r.b)) restBone(r, k);
+  const qx = (a) => new THREE.Quaternion().setFromAxisAngle(AX, a), qy = (a) => new THREE.Quaternion().setFromAxisAngle(AY, a);
+  const arm = (side, swing) => { if (r.down[side]) setBone(r, side + "UpperArm", qx(swing).multiply(r.down[side])); };
+  if (act === "walk") {
+    const s = Math.sin(p * 7);
+    setBone(r, "LeftUpperLeg", qx(s * 0.55)); setBone(r, "RightUpperLeg", qx(-s * 0.55));
+    setBone(r, "LeftLowerLeg", qx(Math.max(0, -s) * 0.7)); setBone(r, "RightLowerLeg", qx(Math.max(0, s) * 0.7));
+    arm("Left", -s * 0.45); arm("Right", s * 0.45);
+    r.root.position.y += Math.abs(Math.cos(p * 7)) * 0.04;
+  } else if (act === "work") {
+    arm("Right", -1.7 + Math.sin(p * 6) * 0.9); arm("Left", -0.6);
+    setBone(r, "Spine", qx(0.12 + Math.sin(p * 6) * 0.04));
+  } else {
+    arm("Left", Math.sin(p * 1.6) * 0.03); arm("Right", -Math.sin(p * 1.6) * 0.03);
+    setBone(r, "Head", qy(Math.sin(p * 0.8) * 0.4));
+  }
+}
+function animChibi(r, act, p) {
+  r.legL.rotation.x = r.legR.rotation.x = r.armL.rotation.x = r.armR.rotation.x = r.torso.rotation.x = 0; r.head.rotation.y = 0;
+  if (act === "walk") { const s = Math.sin(p * 7); r.legL.rotation.x = s * 0.6; r.legR.rotation.x = -s * 0.6; r.armL.rotation.x = -s * 0.5; r.armR.rotation.x = s * 0.5; r.root.position.y += Math.abs(Math.cos(p * 7)) * 0.05; }
+  else if (act === "work") { r.armR.rotation.x = -1.7 + Math.sin(p * 6) * 0.9; r.armL.rotation.x = -0.6; r.torso.rotation.x = 0.18 + Math.sin(p * 6) * 0.06; }
+  else r.head.rotation.y = Math.sin(p * 0.8) * 0.4;
+}
+// Which body an NPC renders with right now (falls back to the chibi while a body is missing or still loading).
+function rigBody(n) {
+  const id = ui.sec === "body" && n.id === ui.sel.look ? ui.sel.body : n.look.body;
+  const B = id && byId(S.bodies, id), c = B && bodyCache[B.id];
+  return c && c.status === "ok" && c.info.bones.length && !bodyMissing(B).length ? B : null;
+}
+function buildRig(n, L) { const B = rigBody(n); return B ? buildImported(L, B) : buildChibi(L); }
+function rigSig(n, L) { const B = rigBody(n); return JSON.stringify([L, B ? [B.id, B.yaw, B.boneMap, B.matSlots, B.hairMode, B.toon, B.attach] : 0]); }
+
+let bodiesBooted = false;
+function bootBodies() {
+  if (bodiesBooted || !look3d.ok) return; bodiesBooted = true;
+  for (const B of S.bodies) if (!bodyCache[B.id]) loadBody(B).then(() => { if (["body", "look"].includes(ui.sec)) render(); else renderNav(); });
+}
+
+function secBody() {
+  const B = byId(S.bodies, ui.sel.body) || S.bodies[0]; if (B) ui.sel.body = B.id;
+  const drop = `<label class="dropzone" id="body-drop"><input type="file" id="body-file" accept=".glb,.gltf,.vrm,.fbx" hidden><b>นำเข้าโมเดล</b><span>ลากไฟล์มาวาง หรือกดเพื่อเลือก<br>.glb (แนะนำ) · .gltf · .vrm · .fbx</span></label>`;
+  const left = `<div>${S.bodies.length ? listHTML("body", S.bodies.map((b) => ({ ...b })), (b) => { const c = bodyCache[b.id]; return !c || c.status === "loading" ? "กำลังโหลด…" : c.status === "ok" ? `กระดูก ${c.info.bones.length}` : c.status === "missing" ? "ไม่มีไฟล์ในเครื่องนี้" : "เปิดไม่ได้"; }) : ""}${drop}</div>`;
+  const intro = head("ร่างพื้นฐาน 3D", "นำเข้าโมเดลที่ใส่กระดูก (rig) แล้วมาเป็นร่างกลางของ NPC ทุกตัว ระบบจับคู่กระดูกกับชื่อมาตรฐาน Humanoid ของ Godot ให้เอง แล้วใช้ท่าเดิน/ทำงาน/ยืนชุดเดียวกัน ผม หมวก และของถือจากหน้า \"รูปลักษณ์ตัวละคร\" จะติดไปกับกระดูกหัวและมือ ส่วนสีผิว ผม และชุดเปลี่ยนตามวัสดุของโมเดล");
+  if (!look3d.ok) return intro + '<p class="muted">โหลดระบบ 3D ไม่สำเร็จ ลองรีเฟรชหน้า</p>';
+  if (!B) return intro + `<div class="work two"><div>${drop}<p class="note">ไฟล์โมเดลเก็บไว้ในเบราว์เซอร์นี้เท่านั้น ไม่ถูกส่งไปที่อื่น</p></div><div class="card"><h2>ยังไม่มีร่างพื้นฐาน</h2><p class="note">ระหว่างนี้ตัวละครใช้ร่างหัวโตชั่วคราว พอนำเข้าโมเดลแรก NPC ทุกตัวจะเปลี่ยนมาใช้ร่างนั้น</p><ul class="note"><li>ส่งออกจาก Blender เป็น glTF Binary (.glb) ใส่ Armature ไปด้วย</li><li>หันหน้าไปทาง +Z (ด้านหน้าของ Blender คือ -Y) ถ้าหันผิดปรับในหน้านี้ได้</li><li>ท่าเริ่มต้นเป็น T-pose หรือ A-pose ก็ได้</li></ul></div></div>`;
+  const c = bodyCache[B.id] || { status: "loading" };
+  let mid;
+  if (c.status === "loading") mid = `<div class="card"><h2>${esc(B.name)}</h2><p class="muted">กำลังโหลด…</p></div>`;
+  else if (c.status !== "ok") mid = `<div class="card"><h2>${esc(B.name)}</h2><p class="note">${c.status === "missing" ? "ไฟล์ของร่างนี้ไม่อยู่ในเบราว์เซอร์นี้ (เปิดจากเครื่องอื่นหรือล้างข้อมูลเว็บไปแล้ว) นำเข้าไฟล์ " + esc(B.file) + " อีกครั้งได้ ค่าที่ตั้งไว้จะใช้กับไฟล์ใหม่" : "เปิดไฟล์ไม่สำเร็จ: " + esc(c.error)}</p><label class="btn" for="body-file-re">นำเข้าไฟล์อีกครั้ง</label><input type="file" id="body-file-re" data-reimport="${B.id}" accept=".glb,.gltf,.vrm,.fbx" hidden> <button type="button" class="btn danger" data-act="body-del">ลบร่างนี้</button></div>`;
+  else {
+    const I = c.info, miss = bodyMissing(B), users = S.npcs.filter((n) => n.look.body === B.id).length;
+    const boneOpts = (cur) => `<option value="">— ไม่มี —</option>` + I.bones.map((b) => `<option value="${esc(b.name)}"${b.name === cur ? " selected" : ""}>${esc("  ".repeat(Math.max(0, b.depth - I.bones[0].depth)) + b.name)}</option>`).join("");
+    mid = `<div class="card"><h2>${esc(B.name)} <span class="muted" style="font-weight:400">· ${esc(B.file)}</span></h2>
+      <div class="chips"><span class="chip">${(B.size / 1048576).toFixed(1)} MB</span><span class="chip">${I.tris.toLocaleString()} สามเหลี่ยม</span><span class="chip${I.bones.length ? "" : " bad"}">กระดูก ${I.bones.length}</span><span class="chip${I.skinned ? "" : " bad"}">ผูกผิว ${I.skinned ? "✓" : "✗"}</span><span class="chip">ท่าในไฟล์ ${c.animations.length}</span><span class="chip">ใช้กับ NPC ${users}/${S.npcs.length}</span></div>
+      <div class="fields"><label class="f">ชื่อร่าง<input type="text" id="body-${B.id}-name" data-body="name" value="${esc(B.name)}"></label>
+      <div class="f">ทิศที่หันหน้า<div class="seg">${[0, 90, 180, 270].map((d) => `<button type="button" class="btn small" data-body-yaw="${d}" aria-pressed="${B.yaw === d}">${d}°</button>`).join("")}</div></div></div>
+      <div class="row-actions"><button type="button" class="btn" data-act="body-all"${users === S.npcs.length ? " disabled" : ""}>ใช้ร่างนี้กับ NPC ทุกตัว</button><button type="button" class="btn danger" data-act="body-del">ลบร่างนี้</button></div>
+      <h3>จับคู่กระดูก (Humanoid ของ Godot)</h3>
+      ${miss.length ? `<p class="note bad">ต้องจับคู่ให้ครบก่อนจึงจะขยับได้: ${esc(miss.join(", "))}</p>` : '<p class="note" style="color:var(--ok)">✓ จับคู่กระดูกหลักครบ ใช้ท่ามาตรฐานได้</p>'}
+      <div class="tablewrap bonemap"><table><thead><tr><th>ชื่อมาตรฐาน</th><th>กระดูกในไฟล์</th></tr></thead><tbody>${HUMANOID.map(([k, l, req]) => `<tr${req && !B.boneMap[k] ? ' class="miss"' : ""}><td><span class="mono">${k}</span><br><small class="muted">${l}${req ? " · จำเป็น" : ""}</small></td><td><select id="bmap-${B.id}-${k}" data-bmap="${k}">${boneOpts(B.boneMap[k])}</select></td></tr>`).join("")}</tbody></table></div>
+      <div class="row-actions"><button type="button" class="btn" data-act="body-automap">จับคู่อัตโนมัติใหม่</button></div>
+      <h3>วัสดุ → สีของตัวละคร</h3>
+      <div class="tablewrap"><table><thead><tr><th>วัสดุในไฟล์</th><th>ใช้สีจาก</th></tr></thead><tbody>${I.materials.map((m, i) => `<tr><td>${esc(m)}</td><td><select id="bmat-${B.id}-${i}" data-bmat="${esc(m)}">${opts(Object.entries(MAT_SLOTS), B.matSlots[m] || "keep")}</select></td></tr>`).join("")}</tbody></table></div>
+      <h3>ผม หมวก ของถือ</h3>
+      <div class="fields"><label class="f">ทรงผม<select id="body-${B.id}-hair" data-body="hairMode">${opts([["model", "ใช้ผมของโมเดล (เปลี่ยนแค่สี)"], ["parts", "ใช้ทรงผมจากชิ้นส่วน (ซ่อนผมโมเดล)"]], B.hairMode)}</select></label>
+      <label class="f">แสงเงา<span><input type="checkbox" id="body-${B.id}-toon" data-body="toon"${B.toon ? " checked" : ""}> แบบการ์ตูน (toon)</span></label></div>
+      ${[["head", "ขนาดหมวก/ผม", 50, 200], ["headY", "ยกหมวกขึ้นลง", -100, 100], ["prop", "ขนาดของถือ", 50, 200]].map(([k, l, a, b]) => `<div class="slider"><span>${l}</span><input type="range" min="${a}" max="${b}" id="body-${B.id}-${k}" data-body-att="${k}" value="${Math.round((B.attach[k] ?? (k === "headY" ? 0 : 1)) * 100)}" aria-label="${l}"><output data-out="body-${B.id}-${k}">${Math.round((B.attach[k] ?? (k === "headY" ? 0 : 1)) * 100)}</output></div>`).join("")}
+    </div>`;
+  }
+  const n = byId(S.npcs, ui.sel.look) || S.npcs[0];
+  const acts = [["walk", "เดิน"], ["work", "ทำงาน"], ["idle", "ยืน"]].concat((c.animations || []).map((a) => ["clip:" + (a.name || "clip"), "▶ " + (a.name || "clip")]));
+  const right = `<div class="card preview" style="max-width:none"><div class="maptools">
+      <label class="f" style="margin:0">ลองกับ<select id="body-try" data-body-try="1">${opts(S.npcs.map((x) => [x.id, x.name]), n && n.id)}</select></label>
+      <div class="seg" role="group" aria-label="ท่าทาง">${acts.map(([k, l]) => `<button type="button" class="btn small" data-look3d="action:${esc(k)}" aria-pressed="${look3d.action === k}">${esc(l)}</button>`).join("")}</div>
+      <label class="f" style="margin:0"><span><input type="checkbox" id="body-bones" data-body-bones="1"${body3d.bones ? " checked" : ""}> แสดงกระดูก</span></label></div>
+    <div class="stagewrap" id="look-stage"><div id="look-labels" class="look-labels"></div></div>
+    <p class="note">ลากเพื่อหมุน · หมวก ผม และของถือมาจากรูปลักษณ์ของ NPC ที่เลือก ถ้าหมวกไม่พอดีหัวให้ปรับขนาด/ความสูงทางซ้าย</p></div>`;
+  return intro + `<div class="work lookw"><div>${left}</div><div class="stack">${mid}</div>${right}</div>`;
 }
 function lookFrame(now) {
   requestAnimationFrame(lookFrame);
-  const L3 = look3d; if (ui.sec !== "look" || !L3.canvas.isConnected) return;
+  const L3 = look3d; if (!["look", "body"].includes(ui.sec) || !L3.canvas.isConnected) return;
   const dt = Math.min(0.1, (now - L3.last) / 1000); L3.last = now; const t = now / 1000;
   const w = L3.canvas.clientWidth, h = L3.canvas.clientHeight;
   if (L3.w !== w || L3.h !== h) { L3.w = w; L3.h = h; L3.renderer.setSize(w, h, false); L3.camera.aspect = w / Math.max(h, 1); L3.camera.updateProjectionMatrix(); }
-  const all = L3.target === "all", ids = S.npcs.map((n) => n.id), cols = Math.min(4, Math.ceil(Math.sqrt(ids.length * 1.6)));
+  const all = L3.target === "all" && ui.sec === "look", ids = S.npcs.map((n) => n.id), cols = Math.min(4, Math.ceil(Math.sqrt(ids.length * 1.6)));
   const labels = document.getElementById("look-labels");
   ids.forEach((id, i) => {
     const r = L3.rigs[id]; if (!r) return; const show = all || id === ui.sel.look; r.root.visible = show; if (!show) return;
     if (all) { const gx = L3.view === "sky" ? 3.6 : 2.4, gz = L3.view === "sky" ? 3.4 : 2.6, row = Math.floor(i / cols), col = i % cols, rowsN = Math.ceil(ids.length / cols); r.root.position.set((col - (cols - 1) / 2) * gx, 0, (row - (rowsN - 1) / 2) * gz); }
     else r.root.position.set(0, 0.12, 0);
     const p = t + r.phase, act = L3.action;
-    r.legL.rotation.x = r.legR.rotation.x = r.armL.rotation.x = r.armR.rotation.x = r.torso.rotation.x = 0; r.head.rotation.y = 0;
-    if (act === "walk") { const s = Math.sin(p * 7); r.legL.rotation.x = s * 0.6; r.legR.rotation.x = -s * 0.6; r.armL.rotation.x = -s * 0.5; r.armR.rotation.x = s * 0.5; r.root.position.y += Math.abs(Math.cos(p * 7)) * 0.05; }
-    else if (act === "work") { r.armR.rotation.x = -1.7 + Math.sin(p * 6) * 0.9; r.armL.rotation.x = -0.6; r.torso.rotation.x = 0.18 + Math.sin(p * 6) * 0.06; }
-    else r.head.rotation.y = Math.sin(p * 0.8) * 0.4;
+    if (r.imported) animImported(r, act, p, dt); else animChibi(r, act, p);
     r.root.rotation.y = all ? 0 : L3.yaw;
   });
   L3.plaza.visible = !all;
   const sel = L3.rigs[ui.sel.look]; L3.ring.visible = all && !!sel; if (sel && all) L3.ring.position.set(sel.root.position.x, 0.03, sel.root.position.z);
   const rows = Math.ceil(ids.length / cols); const span = all ? Math.max(cols * 2.4, rows * 2.6) : 2.4;
-  const sky = L3.view === "sky"; const dist = sky ? (all ? span * 3.9 : 22) : (all ? span * 2.2 : 7.5); const pitch = sky ? 0.95 : 0.3; const yaw = all ? L3.yaw : 0;
+  const sky = L3.view === "sky" && ui.sec === "look", oneImp = !all && L3.rigs[ui.sel.look]?.imported; const dist = sky ? (all ? span * 3.9 : 22) : (all ? span * 2.2 : oneImp ? 5.6 : 7.5); const pitch = sky ? 0.95 : 0.3; const yaw = all ? L3.yaw : 0;
   L3.camera.fov = sky ? 40 : 30; L3.camera.updateProjectionMatrix();
   const ty = sky ? 0 : (all ? 0.8 : 1.05);
   L3.camPos.lerp(new THREE.Vector3(Math.sin(yaw) * Math.cos(pitch) * dist, ty + Math.sin(pitch) * dist, Math.cos(yaw) * Math.cos(pitch) * dist), Math.min(1, dt * 5));
   L3.camera.position.copy(L3.camPos); L3.camera.lookAt(0, ty, 0);
+  const wantSk = ui.sec === "body" && body3d.bones ? L3.rigs[ui.sel.look] : null;
+  if (L3.skFor !== wantSk) { if (L3.sk) { L3.scene.remove(L3.sk); L3.sk = null; } L3.skFor = wantSk; if (wantSk && wantSk.imported) { L3.sk = new THREE.SkeletonHelper(wantSk.model); L3.sk.material.depthTest = false; L3.scene.add(L3.sk); } }
   L3.renderer.render(L3.scene, L3.camera);
   if (labels) {
     const v = new THREE.Vector3();
@@ -1002,9 +1353,10 @@ function secLook() {
   const col = (f, v, dis) => `<input type="color" id="look-${n.id}-${f}" data-look="${f}" value="${esc(v)}"${dis ? " disabled" : ""}>`;
   const rng = (f, v, min, max) => `<div class="slider"><span>${f === "height" ? "ส่วนสูง" : "รูปร่าง"}</span><input type="range" min="${min}" max="${max}" id="look-${n.id}-${f}" data-look="${f}" data-pct="1" value="${Math.round(v * 100)}" aria-label="${f}"><output data-out="look-${n.id}-${f}">${Math.round(v * 100)}</output></div>`;
   const li2 = lookIssues();
-  return head("รูปลักษณ์ตัวละคร", "ตัวละครแบบหัวโต (Chibi) ประกอบจากชิ้นส่วน เปลี่ยนทรงผม ชุด หมวก และของถือได้ สีชุดผูกกับอาชีพเพื่อให้ผู้เล่นจำได้จากมุมเกม ระบบจะใช้ชิ้นส่วนชุดเดียวกันนี้สร้าง NPC ใหม่และลูกหลานรุ่นต่อไปเอง") + `
+  return head("รูปลักษณ์ตัวละคร", "ทุกคนใช้ร่างพื้นฐานเดียวกัน (นำเข้าได้ที่หน้า \"ร่างพื้นฐาน 3D\" ระหว่างยังไม่มีจะใช้ร่างหัวโตชั่วคราว) แล้วแยกกันด้วยทรงผม สีผิว สีชุด หมวก และของถือ สีชุดผูกกับอาชีพเพื่อให้ผู้เล่นจำได้จากมุมเกม ระบบจะใช้ชิ้นส่วนชุดเดียวกันนี้สร้าง NPC ใหม่และลูกหลานรุ่นต่อไปเอง") + `
   <div class="work lookw"><div>${left}</div>
   <div class="stack"><div class="card"><h2>${esc(n.name)} <span class="muted" style="font-weight:400">· ${esc(n.role)}</span></h2>
+    <div class="fields"><label class="f full">ร่าง<select id="look-${n.id}-body" data-look="body">${opts([["", "ร่างหัวโตชั่วคราว"], ...S.bodies.map((b) => [b.id, b.name + (rigBody({ id: "", look: { body: b.id } }) ? "" : " (ยังใช้ไม่ได้)")])], L.body || "")}</select></label></div>
     <h3>หัว</h3><div class="fields">
       ${li("hair", "ทรงผม", sl("hair", HAIRS, L.hair))}${li("hairColor", "สีผม", col("hairColor", L.hairColor))}
       ${li("hat", "หมวก", sl("hat", HATS, L.hat))}
@@ -1031,11 +1383,11 @@ function secLook() {
     </tbody></table></div></div>`;
 }
 function lookAttach() {
-  if (ui.sec !== "look" || !look3d.ok) return; initLook3d(); syncRigs();
+  if (!["look", "body"].includes(ui.sec) || !look3d.ok) return; initLook3d(); bootBodies(); syncRigs();
   const st = document.getElementById("look-stage"); if (st && look3d.canvas.parentNode !== st) st.insertBefore(look3d.canvas, st.firstChild);
 }
 
-const SEC_FN = { look: secLook, overview: secOverview, world: secWorld, npc: secNPC, monster: secMonster, good: secGood, quest: secQuest, crisis: secCrisis, template: secTemplate, power: secPower, balance: secBalance, sim: secSim };
+const SEC_FN = { look: secLook, body: secBody, overview: secOverview, world: secWorld, npc: secNPC, monster: secMonster, good: secGood, quest: secQuest, crisis: secCrisis, template: secTemplate, power: secPower, balance: secBalance, sim: secSim };
 function derived() { lookAttach(); npcPreview(); monPreview(); goodPreview(); questPreview(); tplPreview(); powerPreview(); simOut(); drawMap(); renderNav(); }
 function render() { $("#main").innerHTML = SEC_FN[ui.sec](); derived(); if (ui.sec === "sim" && !ui.simResult) { ui.simResult = simulate(ui.sim); simOut(); } }
 function changed(full) { save(); if (ui.sec === "sim") ui.simResult = simulate(ui.sim); else ui.simResult = null; if (full) render(); else derived(); }
@@ -1055,7 +1407,7 @@ main.addEventListener("input", (e) => {
     n.look[f] = t.type === "checkbox" ? t.checked : t.dataset.pct ? Number(t.value) / 100 : t.value;
     if (f === "main" || f === "useRole") n.color = lookOf(n).main;
     save(); syncRigs(); renderNav();
-    if (["useRole", "hair", "hat", "prop", "hairColor", "main", "outfit", "beard"].includes(f) && t.type !== "color") render();
+    if (["useRole", "hair", "hat", "prop", "hairColor", "main", "outfit", "beard", "body"].includes(f) && t.type !== "color") render();
     return;
   }
   if (t.dataset.rp) {
@@ -1063,6 +1415,16 @@ main.addEventListener("input", (e) => {
     for (const n of S.npcs) if (n.role === role && n.look.useRole) n.color = lookOf(n).main;
     save(); syncRigs(); renderNav(); if (t.tagName === "SELECT") render(); return;
   }
+  if (t.dataset.body || t.dataset.bodyAtt || t.dataset.bmap || t.dataset.bmat) {
+    const B = byId(S.bodies, ui.sel.body); if (!B) return;
+    if (t.dataset.body) { const f = t.dataset.body; B[f] = t.type === "checkbox" ? t.checked : t.value; if (f === "name") { const lab = document.querySelector(`[data-label="${CSS.escape(B.id)}"]`); if (lab) lab.textContent = t.value || "(ไม่มีชื่อ)"; } }
+    else if (t.dataset.bodyAtt) { B.attach = B.attach || {}; B.attach[t.dataset.bodyAtt] = Number(t.value) / 100; }
+    else if (t.dataset.bmap) { if (t.value) B.boneMap[t.dataset.bmap] = t.value; else delete B.boneMap[t.dataset.bmap]; }
+    else B.matSlots[t.dataset.bmat] = t.value;
+    save(); syncRigs(); renderNav(); if (t.dataset.bmap || (t.dataset.body && t.dataset.body !== "name")) render(); return;
+  }
+  if (t.dataset.bodyTry) { ui.sel.look = t.value; syncRigs(); return; }
+  if (t.dataset.bodyBones) { body3d.bones = t.checked; return; }
   if (t.dataset.sc) { ui.sc[t.dataset.sc] = Number(t.value); npcPreview(); return; }
   if (t.dataset.stock) { ui.stock = Number(t.value); goodPreview(); return; }
   if (t.dataset.rel != null) { const n = byId(S.npcs, ui.sel.npc); const r = n.rel[+t.dataset.rel]; r[t.dataset.rf] = ["trust", "affinity", "respect", "grievance"].includes(t.dataset.rf) ? clamp(Number(t.value) || 0, 0, 100) : t.value; changed(); return; }
@@ -1074,17 +1436,30 @@ main.addEventListener("input", (e) => {
   if (t.dataset.sim) { const k = t.dataset.sim; ui.sim[k] = k === "omen" ? t.value === "true" : k === "death" ? t.value : Number(t.value); if (k === "days") ui.sim.days = clamp(ui.sim.days || 30, 5, 120); return; }
 });
 main.addEventListener("change", (e) => { if (e.target.dataset.party) { ui.party = [...document.querySelectorAll("[data-party]:checked")].map((x) => x.dataset.party); monPreview(); } if (e.target.dataset.bool) main.dispatchEvent(new Event("input")); });
+main.addEventListener("change", (e) => { const t = e.target; if (t.type === "file" && t.files && t.files[0]) { if (t.dataset.reimport) reimportBody(t.dataset.reimport, t.files[0]); else importBodyFile(t.files[0]); t.value = ""; } });
+main.addEventListener("dragover", (e) => { const d = e.target.closest("#body-drop"); if (d) { e.preventDefault(); d.classList.add("over"); } });
+main.addEventListener("dragleave", (e) => { const d = e.target.closest("#body-drop"); if (d) d.classList.remove("over"); });
+main.addEventListener("drop", (e) => { const d = e.target.closest("#body-drop"); if (!d) return; e.preventDefault(); d.classList.remove("over"); const f = e.dataTransfer.files[0]; if (f) importBodyFile(f); });
 main.addEventListener("click", (e) => {
   const pick = e.target.closest("[data-pick]"); if (pick) { ui.sel[ui.sec] = pick.dataset.pick; ui.confirm = null; render(); return; }
   const gt = e.target.closest("[data-goto]"); if (gt) { const sec = gt.dataset.goto, id = gt.dataset.gotoId; go(sec, id ? (sec === "world" ? { kind: gt.dataset.gotoKind || "node", id } : id) : null); return; }
   const tok = e.target.closest("[data-tok]"); if (tok) { const ta = document.querySelector("textarea[data-field='text']"); const t = byId(S.templates, ui.sel.template); if (ta && t) { const p = ta.selectionStart ?? ta.value.length; ta.value = ta.value.slice(0, p) + "{" + tok.dataset.tok + "}" + ta.value.slice(p); t.text = ta.value; changed(); ta.focus(); } return; }
   const rb = e.target.closest("[data-reset-bal]"); if (rb) { setPath(S.balance, rb.dataset.resetBal, getPath(DEFAULT.balance, rb.dataset.resetBal)); changed(true); return; }
   const sk = e.target.closest("[data-skin]"); if (sk) { const n = byId(S.npcs, ui.sel.look); n.look.skin = sk.dataset.skin; save(); render(); return; }
-  const l3 = e.target.closest("[data-look3d]"); if (l3) { const [k, v] = l3.dataset.look3d.split(":"); look3d[k] = v; render(); return; }
+  const l3 = e.target.closest("[data-look3d]"); if (l3) { const s3 = l3.dataset.look3d, ci = s3.indexOf(":"); look3d[s3.slice(0, ci)] = s3.slice(ci + 1); render(); return; }
+  const by = e.target.closest("[data-body-yaw]"); if (by) { const B = byId(S.bodies, ui.sel.body); if (B) { B.yaw = Number(by.dataset.bodyYaw); save(); render(); } return; }
   const b = e.target.closest("[data-act]"); if (!b) return; const act = b.dataset.act;
+  if (act === "body-all" || act === "body-del" || act === "body-automap") {
+    const B = byId(S.bodies, ui.sel.body); if (!B) return;
+    if (act === "body-del" && !b.dataset.armed) { b.dataset.armed = "1"; b.textContent = "กดอีกครั้งเพื่อลบ"; setTimeout(() => { if (b.isConnected) { delete b.dataset.armed; b.textContent = "ลบร่างนี้"; } }, 3000); return; }
+    if (act === "body-all") { for (const x of S.npcs) x.look.body = B.id; toast(`NPC ทุกตัวใช้ร่าง ${B.name} แล้ว`); }
+    if (act === "body-automap") { const c = bodyCache[B.id]; if (c && c.info) B.boneMap = autoMapBones(c.info); toast("จับคู่กระดูกใหม่แล้ว"); }
+    if (act === "body-del") { S.bodies = S.bodies.filter((x) => x.id !== B.id); for (const x of S.npcs) if (x.look.body === B.id) x.look.body = S.bodies[0]?.id || ""; modelStore.del(B.id); delete bodyCache[B.id]; ui.sel.body = S.bodies[0]?.id || null; toast("ลบร่างแล้ว"); }
+    changed(true); return;
+  }
   if (act === "look-random" || act === "look-role") {
     const n = byId(S.npcs, ui.sel.look); if (!n) return;
-    if (act === "look-random") n.look = { ...randomLook(n.role), name: undefined };
+    if (act === "look-random") n.look = { ...randomLook(n.role), body: n.look.body, name: undefined };
     else { const P = S.rolePalette[n.role]; Object.assign(n.look, { outfit: P.outfit, prop: P.prop, hat: P.hat, useRole: true }); }
     delete n.look.name; n.color = lookOf(n).main; changed(true); return;
   }
@@ -1115,8 +1490,8 @@ main.addEventListener("click", (e) => {
 // top bar
 $("#json-btn").addEventListener("click", () => {
   const d = $("#drawer"); if (!d.hidden) { d.hidden = true; return; }
-  const pick = { world: { nodes: S.nodes, routes: S.routes.map(({ _lx, _ly, ...r }) => r) }, npc: { npcs: S.npcs }, look: { rolePalette: S.rolePalette, looks: Object.fromEntries(S.npcs.map((n) => [n.id, n.look])) }, monster: { monsters: S.monsters }, good: { goods: S.goods }, quest: { quests: S.quests }, crisis: { crisis: S.crisis }, template: { templates: S.templates }, power: { powers: S.balance.powers, influence: S.balance.influence }, balance: { balance: S.balance } }[ui.sec];
-  const file = { world: "world.json", npc: "npcs.json", look: "character_looks.json", monster: "monsters.json", good: "goods.json", quest: "quests.json", crisis: "crisis.json", template: "chronicle_templates.json", power: "balance.json (powers)", balance: "balance.json" }[ui.sec];
+  const pick = { world: { nodes: S.nodes, routes: S.routes.map(({ _lx, _ly, ...r }) => r) }, npc: { npcs: S.npcs }, look: { rolePalette: S.rolePalette, looks: Object.fromEntries(S.npcs.map((n) => [n.id, n.look])) }, body: { base_bodies: S.bodies }, monster: { monsters: S.monsters }, good: { goods: S.goods }, quest: { quests: S.quests }, crisis: { crisis: S.crisis }, template: { templates: S.templates }, power: { powers: S.balance.powers, influence: S.balance.influence }, balance: { balance: S.balance } }[ui.sec];
+  const file = { world: "world.json", npc: "npcs.json", look: "character_looks.json", body: "base_bodies.json", monster: "monsters.json", good: "goods.json", quest: "quests.json", crisis: "crisis.json", template: "chronicle_templates.json", power: "balance.json (powers)", balance: "balance.json" }[ui.sec];
   $("#drawer-title").textContent = pick ? "data/" + file : "ทั้งโครงการ";
   $("#json-out").textContent = JSON.stringify(pick || { ...S, routes: S.routes.map(({ _lx, _ly, ...r }) => r) }, null, 2); d.hidden = false;
 });
@@ -1133,7 +1508,7 @@ resetBtn.addEventListener("click", () => {
 window.addEventListener("resize", () => { drawMap(); goodPreview(); simOut(); });
 
 const start = (location.hash || "").slice(1); if (SEC_FN[start]) ui.sec = start;
-render();
+render(); if (S.bodies.length) bootBodies();
 })();
 </script>
 </body>
