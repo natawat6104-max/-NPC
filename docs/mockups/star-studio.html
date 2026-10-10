@@ -90,6 +90,7 @@ input[type=color]:disabled { opacity: 0.6; cursor: not-allowed; }
 .bonemap { max-height: 380px; overflow: auto; }
 .bonemap tr.miss td:first-child { color: var(--bad); }
 .bonemap select { width: 100%; }
+details.fingers { margin: 10px 0 4px; } details.fingers summary { cursor: pointer; color: var(--muted); font-size: 0.85rem; padding: 6px 0; }
 .list { display: flex; flex-direction: column; gap: 4px; }
 .list .item { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; border: 1px solid transparent; background: transparent; border-radius: 8px; padding: 6px 10px; }
 .list .item:hover { background: var(--surface); }
@@ -996,6 +997,10 @@ const HUMANOID = [
   ["LeftUpperLeg", "ต้นขาซ้าย", 1], ["LeftLowerLeg", "หน้าแข้งซ้าย", 1], ["LeftFoot", "เท้าซ้าย", 1], ["LeftToes", "นิ้วเท้าซ้าย", 0],
   ["RightUpperLeg", "ต้นขาขวา", 1], ["RightLowerLeg", "หน้าแข้งขวา", 1], ["RightFoot", "เท้าขวา", 1], ["RightToes", "นิ้วเท้าขวา", 0],
 ];
+// Optional finger slots (Godot names). Many auto-rigs (Meshy, Mixamo "fewer fingers") give one chain per hand that bends the whole hand like a mitten.
+const FINGER_NAMES = { Thumb: "นิ้วโป้ง", Index: "นิ้วชี้", Middle: "นิ้วกลาง", Ring: "นิ้วนาง", Little: "นิ้วก้อย" };
+const FINGERS = [];
+for (const [side, th] of [["Left", "ซ้าย"], ["Right", "ขวา"]]) for (const [f, fl] of Object.entries(FINGER_NAMES)) (f === "Thumb" ? ["Metacarpal", "Proximal", "Distal"] : ["Proximal", "Intermediate", "Distal"]).forEach((j, i) => FINGERS.push([side + f + j, `${fl}${th} ข้อ ${i + 1}`, 0, side, f, i]));
 const MAT_SLOTS = { keep: "คงสีเดิมของโมเดล", skin: "ผิว", hair: "ผม", main: "ชุด สีหลัก", accent: "ชุด สีรอง" };
 const BODY_HEIGHT = 1.9; // scene units, same as the placeholder chibi
 const bodyCache = {};
@@ -1069,6 +1074,11 @@ function autoMapBones(info) {
     map[P + "LowerLeg"] = (find(/^(leg|lowerleg|calf|shin|knee|leg0*2)$/, side) || find(/calf|shin|lowerleg/, side) || {}).name;
     map[P + "Foot"] = (find(/^(foot|ankle)$/, side) || find(/foot|ankle/, side) || {}).name;
     map[P + "Toes"] = (find(/toe/, side) || {}).name;
+  }
+  for (const b of info.bones.map((x) => ({ ...x, ...boneCore(x.name) }))) {
+    const m = b.core.match(/(thumb|index|middle|ring|pinky|little)\D*0*([123])$/); if (!m || !b.side) continue;
+    const f = m[1] === "pinky" ? "Little" : m[1][0].toUpperCase() + m[1].slice(1), side = b.side === "L" ? "Left" : "Right";
+    const slot = FINGERS.find((x) => x[3] === side && x[4] === f && x[5] === +m[2] - 1); if (slot && !map[slot[0]]) map[slot[0]] = b.name;
   }
   for (const k of Object.keys(map)) if (!map[k]) delete map[k];
   return map;
@@ -1191,7 +1201,7 @@ function buildImported(L, B) {
   const nodeOf = Object.fromEntries(I.bones.map((b) => [b.name, b.node]));
   const r = { root, imported: true, model, b: {} };
   const rootInv = root.getWorldQuaternion(new THREE.Quaternion()).invert();
-  for (const [slot] of HUMANOID) {
+  for (const [slot] of HUMANOID.concat(FINGERS)) {
     const bone = byNode[nodeOf[B.boneMap[slot]]]; if (!bone) continue;
     const P = bone.parent.getWorldQuaternion(new THREE.Quaternion()).premultiply(rootInv);
     r.b[slot] = { bone, rest: bone.quaternion.clone(), P, Pinv: P.clone().invert() };
@@ -1205,6 +1215,15 @@ function buildImported(L, B) {
     const dir = wpos(end).sub(wpos(side + "UpperArm")).normalize();
     r.down[side] = new THREE.Quaternion().setFromUnitVectors(dir, new THREE.Vector3(sx * 0.22, -1, 0.04).normalize());
   }
+  // Finger hinge axes in the rest pose: curl each finger toward the palm (rigs are T/A-posed with palms down).
+  r.fingers = { Left: [], Right: [] };
+  for (const [slot, , , side, f, j] of FINGERS) {
+    const b = r.b[slot], child = b && b.bone.children.find((x) => x.isBone); if (!child) continue;
+    const d = child.getWorldPosition(new THREE.Vector3()).sub(b.bone.getWorldPosition(new THREE.Vector3())); if (d.lengthSq() < 1e-12) continue;
+    const axis = new THREE.Vector3().crossVectors(d.normalize(), new THREE.Vector3(0, -1, 0)); if (axis.lengthSq() < 1e-6) continue;
+    r.fingers[side].push({ slot, axis: axis.normalize(), amount: (f === "Thumb" ? 0.45 : 1) * [1, 1, 0.7][j] });
+  }
+  r.hold = { Right: ["hammer", "hoe", "spear"].includes(L.prop), Left: L.prop === "lantern" };
   // Attachments: same part builders as the chibi, scaled to this body.
   const A = B.attach || { head: 1, headY: 0, prop: 1 }, swap = Math.abs(Math.sin((B.yaw * Math.PI) / 180)) > 0.5;
   if (r.b.Head) {
@@ -1239,7 +1258,7 @@ function animImported(r, act, p, dt) {
   }
   if (r.playing) { r.mixer.stopAllAction(); r.playing = null; }
   for (const k of Object.keys(r.b)) restBone(r, k);
-  const qx = (a) => new THREE.Quaternion().setFromAxisAngle(AX, a), qy = (a) => new THREE.Quaternion().setFromAxisAngle(AY, a);
+  let idle = false; const qx = (a) => new THREE.Quaternion().setFromAxisAngle(AX, a), qy = (a) => new THREE.Quaternion().setFromAxisAngle(AY, a);
   const arm = (side, swing) => { if (r.down[side]) setBone(r, side + "UpperArm", qx(swing).multiply(r.down[side])); };
   if (act === "walk") {
     const s = Math.sin(p * 7);
@@ -1251,9 +1270,11 @@ function animImported(r, act, p, dt) {
     arm("Right", -1.7 + Math.sin(p * 6) * 0.9); arm("Left", -0.6);
     setBone(r, "Spine", qx(0.12 + Math.sin(p * 6) * 0.04));
   } else {
-    arm("Left", Math.sin(p * 1.6) * 0.03); arm("Right", -Math.sin(p * 1.6) * 0.03);
+    idle = true; arm("Left", Math.sin(p * 1.6) * 0.03); arm("Right", -Math.sin(p * 1.6) * 0.03);
     setBone(r, "Head", qy(Math.sin(p * 0.8) * 0.4));
   }
+  // Hands holding a tool close into a grip; empty hands stay slightly relaxed.
+  for (const side of ["Left", "Right"]) { const k = r.hold[side] || (side === "Right" && act === "work" && !idle) ? 1.05 : 0.18; for (const f of r.fingers[side]) setBone(r, f.slot, new THREE.Quaternion().setFromAxisAngle(f.axis, f.amount * k)); }
 }
 function animChibi(r, act, p) {
   r.legL.rotation.x = r.legR.rotation.x = r.armL.rotation.x = r.armR.rotation.x = r.torso.rotation.x = 0; r.head.rotation.y = 0;
@@ -1301,6 +1322,10 @@ function secBody() {
       <h3>จับคู่กระดูก (Humanoid ของ Godot)</h3>
       ${miss.length ? `<p class="note bad">ต้องจับคู่ให้ครบก่อนจึงจะขยับได้: ${esc(miss.join(", "))}</p>` : '<p class="note" style="color:var(--ok)">✓ จับคู่กระดูกหลักครบ ใช้ท่ามาตรฐานได้</p>'}
       <div class="tablewrap bonemap"><table><thead><tr><th>ชื่อมาตรฐาน</th><th>กระดูกในไฟล์</th></tr></thead><tbody>${HUMANOID.map(([k, l, req]) => `<tr${req && !B.boneMap[k] ? ' class="miss"' : ""}><td><span class="mono">${k}</span><br><small class="muted">${l}${req ? " · จำเป็น" : ""}</small></td><td><select id="bmap-${B.id}-${k}" data-bmap="${k}">${boneOpts(B.boneMap[k])}</select></td></tr>`).join("")}</tbody></table></div>
+      ${(() => { const got = FINGERS.filter(([k]) => B.boneMap[k]), mitten = got.length && got.every((x) => x[4] === "Index");
+        return `<details class="fingers"${body3d.fingersOpen ? " open" : ""}><summary>นิ้ว (ไม่บังคับ · ใช้กำมือตอนถือของ) — จับคู่แล้ว ${got.length}/${FINGERS.length}</summary>
+        <p class="note">${!got.length ? "ไม่มีกระดูกนิ้ว มือจะแบตลอด ไม่กระทบการเล่นเพราะมองจากฟ้า แต่ถ้าอยากให้กำของได้ต้องใส่กระดูกนิ้วตอน rig" : mitten ? "โมเดลนี้มีนิ้วชุดเดียวต่อมือ (แบบถุงมือ) ทุกนิ้วงอพร้อมกัน พอสำหรับกำของและมองจากมุมเกม ถ้าอยากให้นิ้วโป้งแยก ให้ rig ใหม่แบบมีนิ้วครบ" : "มือที่ถือของ (ค้อน จอบ หอก ตะเกียง) จะกำ มือว่างจะงอเล็กน้อย"}</p>
+        <div class="tablewrap bonemap"><table><thead><tr><th>ชื่อมาตรฐาน</th><th>กระดูกในไฟล์</th></tr></thead><tbody>${FINGERS.map(([k, l]) => `<tr><td><span class="mono">${k}</span><br><small class="muted">${l}</small></td><td><select id="bmap-${B.id}-${k}" data-bmap="${k}">${boneOpts(B.boneMap[k])}</select></td></tr>`).join("")}</tbody></table></div></details>`; })()}
       <div class="row-actions"><button type="button" class="btn" data-act="body-automap">จับคู่อัตโนมัติใหม่</button></div>
       <h3>วัสดุ → สีของตัวละคร</h3>
       <div class="tablewrap"><table><thead><tr><th>วัสดุในไฟล์</th><th>ใช้สีจาก</th></tr></thead><tbody>${I.materials.map((m, i) => `<tr><td>${esc(m)}</td><td><select id="bmat-${B.id}-${i}" data-bmat="${esc(m)}">${opts(Object.entries(MAT_SLOTS), B.matSlots[m] || "keep")}</select></td></tr>`).join("")}</tbody></table></div>
@@ -1446,6 +1471,7 @@ main.addEventListener("input", (e) => {
 });
 main.addEventListener("change", (e) => { if (e.target.dataset.party) { ui.party = [...document.querySelectorAll("[data-party]:checked")].map((x) => x.dataset.party); monPreview(); } if (e.target.dataset.bool) main.dispatchEvent(new Event("input")); });
 main.addEventListener("change", (e) => { const t = e.target; if (t.type === "file" && t.files && t.files[0]) { if (t.dataset.reimport) reimportBody(t.dataset.reimport, t.files[0]); else importBodyFile(t.files[0]); t.value = ""; } });
+main.addEventListener("toggle", (e) => { if (e.target.matches && e.target.matches("details.fingers")) body3d.fingersOpen = e.target.open; }, true);
 main.addEventListener("dragover", (e) => { const d = e.target.closest("#body-drop"); if (d) { e.preventDefault(); d.classList.add("over"); } });
 main.addEventListener("dragleave", (e) => { const d = e.target.closest("#body-drop"); if (d) d.classList.remove("over"); });
 main.addEventListener("drop", (e) => { const d = e.target.closest("#body-drop"); if (!d) return; e.preventDefault(); d.classList.remove("over"); const f = e.dataTransfer.files[0]; if (f) importBodyFile(f); });
