@@ -1,8 +1,9 @@
 # เอกสารออกแบบ — พงศาวดารใต้ดวงดาว
 
 - [`DECISIONS.md`](DECISIONS.md) — การตัดสินใจที่ใช้ตัดสินเมื่อเอกสารขัดกัน **อ่านก่อน**
+- [`GODOT-IMPORT.md`](GODOT-IMPORT.md) — นำร่างตัวละครเข้า Godot (ขนาด texture, จับคู่กระดูก)
 - [`BALANCE.md`](BALANCE.md) — ตารางตัวเลขกลาง (สร้างจาก `data/balance.json`)
-- `mockups/` — ต้นแบบหน้าจอ (เปิดในเบราว์เซอร์); `mockups/samples/test-rig-mixamo.glb` คือโมเดลทดสอบที่มีกระดูก ใช้ลองหน้า "ร่างพื้นฐาน 3D"
+- `mockups/` — ต้นแบบหน้าจอ (เปิดในเบราว์เซอร์); `mockups/models/char10-base.glb` คือร่างพื้นฐานที่ Studio โหลดเอง; `mockups/samples/test-rig-mixamo.glb` คือโมเดลทดสอบ
 - `gdd/` — GDD 15 ไฟล์ (แปลงจาก .docx; ต้นฉบับอยู่ใน `gdd/original/`)
 
 ## สถานะของแต่ละไฟล์

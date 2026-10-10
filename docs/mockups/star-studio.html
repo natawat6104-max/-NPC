@@ -1081,6 +1081,43 @@ function autoMapBones(info) {
     const slot = FINGERS.find((x) => x[3] === side && x[4] === f && x[5] === +m[2] - 1); if (slot && !map[slot[0]]) map[slot[0]] = b.name;
   }
   for (const k of Object.keys(map)) if (!map[k]) delete map[k];
+  // Generic names (Bone_000…, Meshy SmartRig) say nothing: fall back to reading the skeleton's shape.
+  if (HUMANOID.some(([k, , req]) => req && !map[k])) { const st = structuralMap(info); if (st && HUMANOID.every(([k, , req]) => !req || st[k])) return st; }
+  return map;
+}
+// Map a humanoid skeleton from its shape: hips branch into two legs and a spine, the chest branches into neck and two arms,
+// hands branch into fingers. Facing comes from the toes, left/right from that facing.
+function structuralMap(info) {
+  const bones = info.bones.map((x) => info.boneObj[x.name]); if (bones.length < 10) return null;
+  const W = (b) => b.getWorldPosition(new THREE.Vector3()), kids = (b) => b.children.filter((c) => c.isBone), nm = realName;
+  const chain = (b) => { const out = [b]; let k; while ((k = kids(out[out.length - 1])).length === 1) out.push(k[0]); return out; };
+  const minY = (b) => { let m = Infinity; b.traverse((o) => { if (o.isBone) m = Math.min(m, W(o).y); }); return m; };
+  const H = info.box.max.y - info.box.min.y || 1;
+  const hips = bones.filter((b) => kids(b).length >= 3 && kids(b).filter((c) => minY(c) < W(b).y - H * 0.3).length >= 2)[0]; if (!hips) return null;
+  const hp = W(hips), legs = kids(hips).filter((c) => minY(c) < hp.y - H * 0.3).map(chain), up = kids(hips).filter((c) => minY(c) >= hp.y - H * 0.3).sort((a, b) => W(b).y - W(a).y)[0];
+  if (legs.length < 2 || !up) return null;
+  const foot = legs[0][Math.min(2, legs[0].length - 1)], toe = legs[0][Math.min(3, legs[0].length - 1)];
+  const fwd = W(toe).sub(W(foot)).setY(0); if (fwd.lengthSq() < 1e-8) fwd.set(0, 0, 1); fwd.normalize();
+  const left = new THREE.Vector3(fwd.z, 0, -fwd.x), side = (b, ref) => (W(b).sub(ref).dot(left) > 0 ? "Left" : "Right");
+  const map = { Hips: nm(hips) };
+  for (const c of legs.slice(0, 2)) { const S = side(c[0], hp); ["UpperLeg", "LowerLeg", "Foot", "Toes"].forEach((k, i) => { if (c[i] && (i < 3 || c.length > 4 || kids(c[i]).length)) map[S + k] = nm(c[i]); }); }
+  const sp = chain(up), chest = sp[sp.length - 1]; if (kids(chest).length < 3) return null;
+  map.Spine = nm(sp[0]); if (sp.length >= 3) { map.Chest = nm(sp[sp.length - 2]); map.UpperChest = nm(chest); } else if (sp.length === 2) map.Chest = nm(chest);
+  const cp = W(chest), branches = kids(chest).map(chain).sort((a, b) => W(b[0]).y - W(a[0]).y);
+  const neck = branches.reduce((best, c) => (Math.abs(W(c[c.length - 1]).sub(cp).dot(left)) < Math.abs(W(best[best.length - 1]).sub(cp).dot(left)) ? c : best));
+  if (neck.length >= 2) { map.Neck = nm(neck[0]); map.Head = nm(neck[1]); } else map.Head = nm(neck[0]);
+  for (const arm of branches.filter((c) => c !== neck).slice(0, 2)) {
+    const S = side(arm[arm.length - 1], cp), n = arm.length, hub = arm[n - 1];
+    const total = W(arm[0]).distanceTo(W(hub)), seg0 = n > 1 ? W(arm[0]).distanceTo(W(arm[1])) : total;
+    const parts = n >= 5 ? ["Shoulder", "UpperArm", "LowerArm", "Hand"] : n === 4 ? (seg0 < total * 0.25 ? ["Shoulder", "UpperArm", "LowerArm", "Hand"] : ["UpperArm", "LowerArm", "Hand"]) : ["UpperArm", "LowerArm", "Hand"];
+    parts.forEach((k, i) => { if (arm[i]) map[S + k] = nm(arm[i]); });
+    const fingers = kids(hub).map(chain); if (!fingers.length) continue;
+    const handDir = W(hub).sub(W(arm[Math.max(0, n - 2)])).normalize(), dirOf = (c) => W(c[c.length - 1]).sub(W(c[0])).normalize();
+    const thumb = fingers.length >= 4 ? fingers.reduce((a, b) => (Math.abs(dirOf(b).dot(handDir)) < Math.abs(dirOf(a).dot(handDir)) ? b : a)) : null;
+    const rest = fingers.filter((c) => c !== thumb).sort((a, b) => W(b[0]).sub(W(hub)).dot(fwd) - W(a[0]).sub(W(hub)).dot(fwd));
+    const put = (c, f) => FINGERS.filter((x) => x[3] === S && x[4] === f).forEach((x) => { if (c[x[5]]) map[x[0]] = nm(c[x[5]]); });
+    if (thumb) put(thumb, "Thumb"); rest.slice(0, 4).forEach((c, i) => put(c, ["Index", "Middle", "Ring", "Little"][i]));
+  }
   return map;
 }
 function guessMatSlot(name) {
@@ -1172,7 +1209,7 @@ async function importBodyBuffer(buf, fileName, size, extra = {}) {
 
 // The sample base body ships next to the page, so the studio shows the team's model without importing it first.
 // .glb in the repo; base64 text where the host only serves text types.
-const SAMPLE_BODY = { src: "models/teen-base.glb", alt: "models/teen-base.glb.b64.txt", file: "teen-base.glb", name: "ร่างพื้นฐาน teen" };
+const SAMPLE_BODY = { v: 2, src: "models/char10-base.glb", alt: "models/char10-base.glb.b64.txt", file: "char10-base.glb", name: "ร่างพื้นฐาน (Meshy Character 10)" };
 async function fetchModel(src, alt) {
   try { const r = await fetch(src); if (r.ok) return await r.arrayBuffer(); } catch (e) {}
   if (!alt) return null;
@@ -1183,8 +1220,12 @@ async function loadSampleBody(manual) {
   if (!look3d.ok || sampleLoading) return; sampleLoading = true;
   try {
     const buf = await fetchModel(SAMPLE_BODY.src, SAMPLE_BODY.alt); if (!buf) throw new Error("missing");
-    S.sampleBodyDone = true;
+    // Swap out an older team sample; bodies the user imported themselves stay.
+    const old = S.bodies.filter((b) => b.src && b.src !== SAMPLE_BODY.src).map((b) => b.id);
+    S.bodies = S.bodies.filter((b) => !old.includes(b.id)); for (const id of old) { modelStore.del(id); delete bodyCache[id]; }
+    S.sampleBodyDone = SAMPLE_BODY.v;
     await importBodyBuffer(buf, SAMPLE_BODY.file, buf.byteLength, { name: SAMPLE_BODY.name, src: SAMPLE_BODY.src, alt: SAMPLE_BODY.alt });
+    const id = S.bodies[S.bodies.length - 1].id; for (const n of S.npcs) if (!n.look.body || old.includes(n.look.body)) n.look.body = id; ui.sel.body = id; save(); render();
   } catch (e) { if (manual) toast("โหลดโมเดลตัวอย่างไม่ได้ (ต้องเปิดหน้านี้ผ่านเว็บ ไม่ใช่เปิดไฟล์ในเครื่อง)"); }
   sampleLoading = false;
 }
@@ -1566,7 +1607,7 @@ resetBtn.addEventListener("click", () => {
 window.addEventListener("resize", () => { drawMap(); goodPreview(); simOut(); });
 
 const start = (location.hash || "").slice(1); if (SEC_FN[start]) ui.sec = start;
-render(); if (S.bodies.length) bootBodies(); else if (!S.sampleBodyDone) loadSampleBody();
+render(); if (S.bodies.length) bootBodies(); if (S.sampleBodyDone !== SAMPLE_BODY.v) loadSampleBody();
 })();
 </script>
 </body>
