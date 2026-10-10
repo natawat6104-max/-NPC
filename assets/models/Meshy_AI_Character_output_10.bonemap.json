@@ -2,7 +2,7 @@
   "model": "assets/models/Meshy_AI_Character_output_10.glb",
   "profile": "SkeletonProfileHumanoid",
   "bone_map": {
-    "Hips": "Bone_001",
+    "Hips": "Bone_000",
     "Spine": "Bone_005",
     "Chest": "Bone_003",
     "UpperChest": "Bone_002",

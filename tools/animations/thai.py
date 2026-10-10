@@ -101,7 +101,7 @@ OVERRIDE = {
     'adv_crouched_sneaking_right': 'ย่อตัวย่องไปขวา',
     'bow_idle_02_looking': 'ธนู: ยืนมองไปรอบ ๆ (ยามเฝ้า)',
     'bow_idle_03_examine': 'ธนู: ยืนตรวจดูธนู',
-    'bow_fall_a_loop': 'กำลังตก (วนได้)',
+    'bow_falling_idle': 'กำลังตก (วนได้)',
     'bow_fall_a_land_to_idle_01': 'ตกลงพื้นแล้วยืน',
     'bow_fall_a_land_to_run_forward': 'ตกลงพื้นแล้ววิ่งต่อ',
     'bow_unarmed_idle_01': 'ยืนพักมือเปล่า',

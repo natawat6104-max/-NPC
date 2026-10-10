@@ -72,7 +72,10 @@ def slug(s):
     return s
 
 jobs, used = [], set()
+RENAME = {'bow_fall_a_loop': 'bow_falling_idle'}  # Godot strips a trailing "_loop"/"_cycle" from clip names
+
 def add(src, name, group, pack, original, pick=None):
+    name = RENAME.get(name, name)
     base = name
     k = 2
     while name in used:

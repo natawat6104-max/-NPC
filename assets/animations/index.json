@@ -395,9 +395,9 @@
    "description_th": "ตกลงพื้นแล้ววิ่งต่อ"
   },
   {
-   "file": "general/bow_fall_a_loop.glb",
+   "file": "general/bow_falling_idle.glb",
    "original_file": "Pro Longbow Pack.zip/fall a loop.fbx",
-   "clip_name": "bow_fall_a_loop",
+   "clip_name": "bow_falling_idle",
    "group": "general",
    "duration_s": 1.1,
    "frames": 33,

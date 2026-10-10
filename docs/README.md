@@ -2,9 +2,10 @@
 
 - [`HANDOFF.md`](HANDOFF.md) — สรุปงานทั้งหมดและงานค้าง สำหรับส่งต่อให้ Claude Code เครื่องอื่น
 - [`DECISIONS.md`](DECISIONS.md) — การตัดสินใจที่ใช้ตัดสินเมื่อเอกสารขัดกัน **อ่านก่อน**
-- [`GODOT-IMPORT.md`](GODOT-IMPORT.md) — นำร่างตัวละครเข้า Godot (ขนาด texture, จับคู่กระดูก)
+- [`GODOT-IMPORT.md`](GODOT-IMPORT.md) — นำร่างตัวละครและท่าทางเข้า Godot (ขนาด texture, จับคู่กระดูก, AnimationLibrary)
 - [`BALANCE.md`](BALANCE.md) — ตารางตัวเลขกลาง (สร้างจาก `data/balance.json`)
 - `mockups/` — ต้นแบบหน้าจอ (เปิดในเบราว์เซอร์); `mockups/models/char10-base.glb` คือร่างพื้นฐานที่ Studio โหลดเอง; `mockups/samples/test-rig-mixamo.glb` คือโมเดลทดสอบ
+- [`../assets/animations/`](../assets/animations/README.md) — ท่าทาง 425 ท่า (ตัดตัวโมเดลออกแล้ว) พร้อมรายการภาษาไทย
 - `gdd/` — GDD 15 ไฟล์ (แปลงจาก .docx; ต้นฉบับอยู่ใน `gdd/original/`)
 
 ## สถานะของแต่ละไฟล์
