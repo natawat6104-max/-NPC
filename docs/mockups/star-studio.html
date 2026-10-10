@@ -1,0 +1,890 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>body{margin:0}[hidden]{display:none!important}</style>
+<title>Star Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600&family=Trirong:wght@600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: top bar · left nav of content types · main workspace (list | editor | live preview), stacking to one column on phones. Single dark "observatory" look matching the game. */
+:root {
+  --bg: #0b1024;
+  --surface: #121a36;
+  --surface-2: #18224a;
+  --line: #27335f;
+  --text: #e6e9f5;
+  --muted: #929dc4;
+  --gold: #e3bf63;
+  --gold-ink: #1b1405;
+  --ok: #6fcfb0;
+  --warn: #e8b04a;
+  --bad: #ee7d5c;
+  --blue: #7fa6ff;
+  --font-display: "Trirong", "Sarabun", Georgia, serif;
+  --font-ui: "Sarabun", "Noto Sans Thai", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--text); font-family: var(--font-ui); font-size: 14px; line-height: 1.5; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+.app { display: grid; grid-template-rows: auto 1fr; height: 100%; }
+.top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: calc(env(safe-area-inset-top, 0px) + 10px) 16px 10px; border-bottom: 1px solid var(--line); background: var(--surface); }
+.brand { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.brand b { font-family: var(--font-display); font-size: 1.2rem; color: var(--gold); letter-spacing: 0.01em; }
+.brand span { color: var(--muted); font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.top .spacer { flex: 1; }
+.saved { color: var(--muted); font-size: 0.8rem; }
+.pill { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--surface-2); border-radius: 999px; padding: 4px 12px; font-size: 0.85rem; }
+.pill.bad { border-color: color-mix(in srgb, var(--bad) 60%, transparent); color: var(--bad); }
+.pill.ok { color: var(--ok); }
+.btn { border: 1px solid var(--line); background: var(--surface-2); border-radius: 8px; padding: 5px 12px; font-size: 0.85rem; }
+.btn:hover { border-color: var(--gold); }
+.btn.primary { background: var(--gold); color: var(--gold-ink); border-color: var(--gold); font-weight: 600; }
+.btn.danger { color: var(--bad); }
+.btn.small { padding: 2px 9px; font-size: 0.8rem; }
+
+.body { display: grid; grid-template-columns: 210px 1fr; min-height: 0; }
+nav.side { border-right: 1px solid var(--line); padding: 12px 8px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+nav.side .grp { font-size: 0.7rem; letter-spacing: 0.08em; color: var(--muted); padding: 10px 10px 4px; text-transform: uppercase; }
+nav.side button { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; text-align: left; background: transparent; border: 0; border-radius: 8px; padding: 7px 10px; color: var(--muted); }
+nav.side button:hover { background: var(--surface); color: var(--text); }
+nav.side button[aria-current="page"] { background: var(--surface-2); color: var(--text); box-shadow: inset 2px 0 0 var(--gold); }
+.count { font-variant-numeric: tabular-nums; font-size: 0.75rem; color: var(--muted); }
+.count.bad { color: var(--bad); font-weight: 600; }
+
+main { overflow-y: auto; padding: 18px 20px 40px; min-width: 0; }
+.head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; margin-bottom: 14px; }
+.head h1 { margin: 0; font-family: var(--font-display); font-weight: 600; font-size: 1.45rem; text-wrap: balance; }
+.head p { margin: 0; color: var(--muted); flex-basis: 100%; max-width: 70ch; }
+.work { display: grid; grid-template-columns: 210px minmax(0, 1fr) minmax(0, 360px); gap: 16px; align-items: start; }
+.work.two { grid-template-columns: minmax(0, 1fr) minmax(0, 380px); }
+.list { display: flex; flex-direction: column; gap: 4px; }
+.list .item { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; border: 1px solid transparent; background: transparent; border-radius: 8px; padding: 6px 10px; }
+.list .item:hover { background: var(--surface); }
+.list .item[aria-selected="true"] { background: var(--surface-2); border-color: var(--line); }
+.list .item small { color: var(--muted); margin-left: auto; font-size: 0.75rem; }
+.dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.warnmark { color: var(--bad); font-weight: 700; }
+
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; min-width: 0; }
+.card h2 { margin: 0 0 10px; font-size: 1rem; font-weight: 600; }
+.card h3 { margin: 14px 0 8px; font-size: 0.78rem; letter-spacing: 0.06em; color: var(--muted); font-weight: 500; text-transform: uppercase; }
+.card h3:first-child { margin-top: 0; }
+.stack { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; }
+.fields .full { grid-column: 1 / -1; }
+label.f { display: flex; flex-direction: column; gap: 4px; font-size: 0.8rem; color: var(--muted); min-width: 0; }
+input[type=text], input[type=number], select, textarea { background: var(--bg); border: 1px solid var(--line); border-radius: 7px; padding: 6px 9px; color: var(--text); width: 100%; min-width: 0; }
+textarea { min-height: 64px; resize: vertical; }
+input[type=number] { font-variant-numeric: tabular-nums; }
+.slider { display: grid; grid-template-columns: 110px 1fr 36px; align-items: center; gap: 10px; font-size: 0.85rem; }
+.slider output { text-align: right; font-variant-numeric: tabular-nums; color: var(--gold); }
+input[type=range] { width: 100%; accent-color: var(--gold); }
+.row-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 0.85rem; }
+th, td { text-align: left; padding: 5px 6px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+th { color: var(--muted); font-weight: 500; font-size: 0.75rem; white-space: nowrap; }
+td input[type=number] { width: 68px; }
+.chip { display: inline-block; border: 1px solid currentColor; border-radius: 999px; padding: 0 8px; font-size: 0.75rem; white-space: nowrap; }
+.chip.low { color: var(--ok); } .chip.mid { color: var(--warn); } .chip.high, .chip.crit { color: var(--bad); }
+.muted { color: var(--muted); }
+.note { font-size: 0.8rem; color: var(--muted); }
+.mono { font-family: var(--font-mono); font-size: 0.8rem; }
+
+.bars { display: flex; flex-direction: column; gap: 8px; }
+.bar { display: grid; grid-template-columns: 120px 1fr 44px; align-items: center; gap: 8px; font-size: 0.85rem; }
+.bar .track { height: 10px; background: var(--bg); border-radius: 999px; overflow: hidden; }
+.bar .fill { height: 100%; background: var(--blue); border-radius: 999px; }
+.bar.win .fill { background: var(--gold); }
+.bar.win span:first-child { color: var(--gold); font-weight: 600; }
+.bar b { text-align: right; font-variant-numeric: tabular-nums; font-weight: 500; }
+.why { margin-top: 10px; padding: 10px 12px; border-left: 2px solid var(--gold); background: var(--surface-2); border-radius: 0 8px 8px 0; }
+
+.mapwrap { position: relative; }
+canvas.map { width: 100%; aspect-ratio: 5 / 3; display: block; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); touch-action: none; }
+.maptools { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.btn[aria-pressed="true"] { background: var(--gold); color: var(--gold-ink); border-color: var(--gold); }
+canvas.chart { width: 100%; height: 170px; display: block; }
+
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
+.kpi { background: var(--surface-2); border-radius: 10px; padding: 10px 12px; }
+.kpi span { display: block; font-size: 0.75rem; color: var(--muted); }
+.kpi b { font-size: 1.3rem; font-variant-numeric: tabular-nums; font-weight: 600; }
+.log { max-height: 340px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; font-size: 0.88rem; }
+.log div { display: grid; grid-template-columns: 52px 1fr; gap: 8px; }
+.log div span { color: var(--muted); font-variant-numeric: tabular-nums; }
+.scope { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+.scope .kpi small { color: var(--muted); }
+.issues { display: flex; flex-direction: column; gap: 6px; }
+.issues button { text-align: left; background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; }
+.issues button:hover { border-color: var(--bad); }
+.preview-quest { border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: var(--bg); }
+.preview-quest b { color: var(--gold); }
+.phases { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.phase { border-top: 3px solid var(--blue); padding-top: 6px; font-size: 0.8rem; min-width: 0; }
+.phase:nth-child(3) { border-color: var(--warn); } .phase:nth-child(4) { border-color: var(--bad); } .phase:nth-child(5) { border-color: var(--ok); }
+.ph { color: var(--bad); background: color-mix(in srgb, var(--bad) 18%, transparent); border-radius: 4px; padding: 0 3px; }
+.tok { cursor: pointer; }
+.changed { color: var(--gold); font-weight: 700; }
+
+.drawer { position: fixed; inset: auto 0 0 0; max-height: 60%; background: var(--surface); border-top: 1px solid var(--gold); padding: 12px 16px calc(env(safe-area-inset-bottom, 0px) + 12px); display: flex; flex-direction: column; gap: 8px; z-index: 10; }
+.drawer[hidden] { display: none; }
+.drawer pre { margin: 0; overflow: auto; background: var(--bg); border-radius: 8px; padding: 10px; font-family: var(--font-mono); font-size: 0.78rem; flex: 1; min-height: 0; }
+.toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--gold); color: var(--gold-ink); padding: 6px 14px; border-radius: 999px; font-weight: 600; z-index: 20; }
+
+@media (max-width: 1100px) { .work { grid-template-columns: 190px minmax(0, 1fr); } .work > .preview { grid-column: 1 / -1; } }
+@media (max-width: 760px) {
+  .body { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  nav.side { flex-direction: row; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--line); padding: 6px 12px; }
+  nav.side .grp { display: none; }
+  nav.side button { width: auto; white-space: nowrap; }
+  main { padding: 14px 16px 40px; }
+  .work, .work.two { grid-template-columns: 1fr; }
+  .list { flex-direction: row; overflow-x: auto; }
+  .list .item { width: auto; white-space: nowrap; }
+  .fields { grid-template-columns: 1fr; }
+  .slider { grid-template-columns: 96px 1fr 32px; }
+  .phases { grid-template-columns: 1fr; }
+  .brand span { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="top">
+    <div class="brand"><b>Star Studio</b><span>พงศาวดารใต้ดวงดาว · ข้อมูลตัวอย่างจาก GDD</span></div>
+    <div class="spacer"></div>
+    <span class="saved" id="saved">ร่างบันทึกในเบราว์เซอร์นี้</span>
+    <button class="pill" id="issues-pill" type="button"></button>
+    <button class="btn" id="json-btn" type="button">ดู JSON</button>
+    <button class="btn danger" id="reset-btn" type="button">คืนค่าตัวอย่าง</button>
+  </header>
+  <div class="body">
+    <nav class="side" id="nav" aria-label="ประเภทเนื้อหา"></nav>
+    <main id="main"></main>
+  </div>
+</div>
+<div class="drawer" id="drawer" hidden>
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <b id="drawer-title">JSON</b><span class="note">ไฟล์ที่ Godot จะอ่าน (data/*.json)</span>
+    <div style="flex:1"></div><button class="btn small" id="copy-json" type="button">คัดลอก</button><button class="btn small" id="close-json" type="button">ปิด</button>
+  </div>
+  <pre id="json-out"></pre>
+</div>
+
+<script>
+(() => {
+"use strict";
+// ======================= example data (from the GDD) =======================
+const DEFAULT = {
+  nodes: [
+    { id: "lumen", name: "หมู่บ้านลูเมน", type: "village", risk: "low", x: 380, y: 330, res: "อาหาร พืชผล ข่าวท้องถิ่น" },
+    { id: "astra", name: "เมืองอัสเทรา", type: "town", risk: "low", x: 200, y: 160, res: "อุปกรณ์ ภารกิจ การรักษา" },
+    { id: "forest", name: "ป่ารากเงิน", type: "wild", risk: "mid", x: 660, y: 170, res: "สมุนไพร หนังสัตว์" },
+    { id: "mine", name: "เหมืองร้าง", type: "wild", risk: "midhigh", x: 270, y: 490, res: "แร่ โบราณวัตถุ" },
+    { id: "tower", name: "หอคอยจันทรา", type: "dungeon", risk: "high", x: 800, y: 450, res: "บอส ของรางวัล เบาะแสโลก" },
+  ],
+  routes: [
+    { id: "r1", a: "lumen", b: "astra", days: 1, danger: "safe", note: "" },
+    { id: "r2", a: "lumen", b: "forest", days: 1, danger: "danger", note: "รอยฝูงหมาป่า (ข่าวลือ)" },
+    { id: "r3", a: "lumen", b: "forest", days: 1.5, danger: "watch", note: "ทางใต้ อ้อมแต่ปลอดภัยกว่า" },
+    { id: "r4", a: "lumen", b: "mine", days: 1, danger: "watch", note: "" },
+    { id: "r5", a: "forest", b: "tower", days: 2, danger: "danger", note: "" },
+    { id: "r6", a: "mine", b: "tower", days: 2, danger: "watch", note: "" },
+    { id: "r7", a: "astra", b: "forest", days: 2, danger: "safe", note: "" },
+  ],
+  npcs: [
+    { id: "rena", name: "เรน่า", role: "นักผจญภัย", home: "lumen", color: "#c8743d", traits: { bravery: 80, caution: 30, generosity: 65, ambition: 55, sociability: 60 }, skills: { combat: 45, gathering: 75, healing: 20, crafting: 15, negotiation: 35 }, goalShort: "ส่งสมุนไพรให้มีรา", goalLong: "เป็นนักผจญภัยที่ปกป้องบ้านเกิด", rel: [{ to: "toma", trust: 40, affinity: 35, respect: 55, grievance: 30, why: "เห็นต่างเรื่องความเสี่ยง" }, { to: "mira", trust: 70, affinity: 60, respect: 70, grievance: 0, why: "มีราเคยรักษาแผลให้" }] },
+    { id: "toma", name: "โทมะ", role: "นักธนู", home: "lumen", color: "#5a6fc4", traits: { bravery: 40, caution: 80, generosity: 45, ambition: 35, sociability: 40 }, skills: { combat: 60, gathering: 40, healing: 10, crafting: 30, negotiation: 25 }, goalShort: "ไม่ให้ใครในปาร์ตี้บาดเจ็บ", goalLong: "เก็บเงินซื้อธนูดีสักคัน", rel: [{ to: "rena", trust: 45, affinity: 40, respect: 60, grievance: 25, why: "เรน่าชอบรีบตัดสินใจ" }] },
+    { id: "mira", name: "มีรา", role: "ผู้รักษา", home: "lumen", color: "#4f9e86", traits: { bravery: 45, caution: 55, generosity: 85, ambition: 30, sociability: 65 }, skills: { combat: 10, gathering: 45, healing: 80, crafting: 35, negotiation: 50 }, goalShort: "หายาให้ผู้ป่วย 2 คน", goalLong: "เปิดห้องรักษาที่มียาพอตลอดปี", rel: [{ to: "rena", trust: 65, affinity: 55, respect: 60, grievance: 0, why: "เรน่ารับงานช่วยหมู่บ้านเสมอ" }] },
+    { id: "bron", name: "บรอน", role: "ช่างตีเหล็ก", home: "lumen", color: "#8a5a3f", traits: { bravery: 55, caution: 50, generosity: 40, ambition: 60, sociability: 70 }, skills: { combat: 35, gathering: 20, healing: 5, crafting: 80, negotiation: 45 }, goalShort: "ซ่อมดาบให้กองรักษาการณ์", goalLong: "รับลูกศิษย์สืบทอดร้าน", rel: [] },
+    { id: "darin", name: "ดาริน", role: "พ่อค้า", home: "lumen", color: "#9c4f7a", traits: { bravery: 35, caution: 65, generosity: 35, ambition: 75, sociability: 80 }, skills: { combat: 15, gathering: 20, healing: 5, crafting: 20, negotiation: 75 }, goalShort: "ขายเสบียงให้ปาร์ตี้", goalLong: "เปิดเส้นทางค้ากับอัสเทรา", rel: [] },
+    { id: "harl", name: "ฮาร์ล", role: "ชาวนา", home: "lumen", color: "#7d8a3c", traits: { bravery: 40, caution: 60, generosity: 55, ambition: 25, sociability: 50 }, skills: { combat: 15, gathering: 60, healing: 10, crafting: 30, negotiation: 25 }, goalShort: "เก็บเกี่ยวก่อนฝนหนัก", goalLong: "เลี้ยงครอบครัวให้พ้นหน้าแล้ง", rel: [] },
+    { id: "nella", name: "เนลลา", role: "ชาวนา", home: "lumen", color: "#b08a3a", traits: { bravery: 50, caution: 45, generosity: 60, ambition: 35, sociability: 55 }, skills: { combat: 20, gathering: 65, healing: 15, crafting: 25, negotiation: 30 }, goalShort: "ขายผลผลิตส่วนเกิน", goalLong: "ซื้อที่ดินเพิ่ม", rel: [] },
+    { id: "kel", name: "เคล", role: "ยามรักษาการณ์", home: "lumen", color: "#4a5a6e", traits: { bravery: 70, caution: 55, generosity: 50, ambition: 40, sociability: 35 }, skills: { combat: 55, gathering: 15, healing: 10, crafting: 15, negotiation: 30 }, goalShort: "เวรกะดึกให้ครบ", goalLong: "เป็นหัวหน้ากองรักษาการณ์", rel: [] },
+  ],
+  monsters: [
+    { id: "shadow_wolf", name: "หมาป่าเงา", kind: "pack", habitat: "forest", threat: 18, gmin: 3, gmax: 6, behavior: "ล่าเป็นฝูง กลัวไฟ", drops: "หนังสัตว์ เขี้ยว" },
+    { id: "bog_slug", name: "ทากพิษ", kind: "common", habitat: "forest", threat: 8, gmin: 1, gmax: 2, behavior: "ช้า พ่นพิษเมื่อถูกโจมตี", drops: "เมือกพิษ (วัตถุดิบยา)" },
+    { id: "rock_bat", name: "ค้างคาวหิน", kind: "pack", habitat: "mine", threat: 10, gmin: 5, gmax: 10, behavior: "รุมจากเพดานถ้ำ", drops: "ปีกหิน" },
+    { id: "moon_warden", name: "ผู้เฝ้าจันทรา", kind: "boss", habitat: "tower", threat: 120, gmin: 1, gmax: 1, behavior: "พลังแรงขึ้นในคืนจันทร์เต็มดวง", drops: "เศษผลึกจันทรา" },
+  ],
+  goods: [
+    { id: "food", name: "อาหาร", cat: "อาหารพื้นฐาน", base: 4, shelf: 7, daily: 12, sub: "" },
+    { id: "medicine", name: "ยาพื้นฐาน", cat: "สมุนไพร/ยา", base: 12, shelf: 30, daily: 3, sub: "moonleaf" },
+    { id: "moonleaf", name: "ใบจันทร์ขาว", cat: "วัตถุดิบเก็บเกี่ยว", base: 5, shelf: 10, daily: 1, sub: "" },
+    { id: "materials", name: "วัตถุดิบทั่วไป", cat: "วัตถุดิบเก็บเกี่ยว", base: 6, shelf: 120, daily: 2, sub: "" },
+    { id: "equipment", name: "อุปกรณ์", cat: "อุปกรณ์", base: 30, shelf: 365, daily: 0.3, sub: "" },
+  ],
+  quests: [
+    { id: "gather", name: "เก็บทรัพยากร/สมุนไพร", trigger: "สต็อกยาของชุมชนต่ำกว่า 50% ของเป้าหมาย", issuer: "ผู้รักษา", dest: "forest", threat: "mid", reward: "เงิน 20 + ความเคารพจากผู้มอบ", success: "ส่งวัตถุดิบครบตามจำนวน", fail: "หมดเวลา หรือปาร์ตี้ถอยกลับมือเปล่า", effect: "สต็อกยาเพิ่ม ขวัญกำลังใจชุมชนดีขึ้น" },
+    { id: "slay", name: "กำจัด/ขับไล่มอนสเตอร์", trigger: "ภัยบนเส้นทางสูงกว่า 60", issuer: "ยามรักษาการณ์", dest: "forest", threat: "high", reward: "เงิน 35 จากคลังเมือง", success: "ภัยเส้นทางลดลงต่ำกว่า 40", fail: "ปาร์ตี้ถอยหรือบาดเจ็บหนัก", effect: "การค้าค่อย ๆ ฟื้น" },
+    { id: "escort", name: "คุ้มกันผู้เดินทาง/สินค้า", trigger: "พ่อค้าต้องเดินทางผ่านเส้นทางเสี่ยง", issuer: "พ่อค้า", dest: "astra", threat: "mid", reward: "ส่วนแบ่งกำไร 15%", success: "ขบวนถึงปลายทาง", fail: "สินค้าถูกปล้นหรือเสียหาย", effect: "ราคาสินค้าในหมู่บ้านลดลง" },
+    { id: "explore", name: "สำรวจพื้นที่", trigger: "มีข่าวลือใหม่เกี่ยวกับสถานที่", issuer: "ยามรักษาการณ์", dest: "mine", threat: "mid", reward: "เงิน 15 + ข้อมูลพื้นที่", success: "กลับมาพร้อมข้อมูล", fail: "หลงทางหรือถอย", effect: "เปิดเผยภัย/ทรัพยากรของพื้นที่" },
+    { id: "deliver", name: "ส่งข่าวหรือสิ่งของ", trigger: "ชุมชนต้องการติดต่ออีกชุมชน", issuer: "พ่อค้า", dest: "astra", threat: "low", reward: "เงิน 8", success: "ส่งถึงมือผู้รับ", fail: "ของหายระหว่างทาง", effect: "ความสัมพันธ์ระหว่างชุมชนดีขึ้น" },
+  ],
+  crisis: {
+    name: "สมุนไพรขาดแคลน", region: "lumen",
+    phases: [
+      { name: "ข่าวลือ", text: "มีราบ่นว่าสมุนไพรในห้องรักษาเหลือน้อย", trigger: "ยา < 60% ของเป้าหมาย" },
+      { name: "ผลกระทบเฉพาะจุด", text: "ผู้ป่วยต้องรอคิว ราคายาขึ้น", trigger: "ยา < 40%" },
+      { name: "ผลกระทบวงกว้าง", text: "คนงานป่วยหยุดงาน ผลผลิตลด", trigger: "ยา < 25% นาน 3 วัน" },
+      { name: "จุดแตกหัก", text: "ต้องเลือกปันส่วนยา หรือส่งคนไปซื้อที่อัสเทรา", trigger: "ยา < 10%" },
+      { name: "ผลลัพธ์", text: "สถานะใหม่ตามผลที่เกิด", trigger: "ครบ 14 วัน หรือยากลับ ≥ 60%" },
+    ],
+    outcomes: [
+      { name: "ยับยั้งได้", cond: "ยากลับ ≥ 60% ภายใน 7 วัน", effect: "ขวัญกำลังใจ +10 · มีราเคารพผู้ช่วย" },
+      { name: "ประคองได้", cond: "ยาไม่ต่ำกว่า 10% ตลอดวิกฤต", effect: "ราคายาสูงต่อ 1 สัปดาห์" },
+      { name: "ล้มเหลวบางส่วน", cond: "ยาเคยหมด", effect: "ผู้ป่วยอาการหนัก · ครัวเรือนบางส่วนย้ายไปอัสเทรา" },
+    ],
+  },
+  templates: [
+    { id: "party_returned", event: "party_returned", text: "{party_leader}พาปาร์ตี้กลับจาก{place}พร้อม{item} {amount} หน่วย{injured_note}" },
+    { id: "npc_injured", event: "npc_injured", text: "{npc}ได้รับบาดเจ็บ{severity}ระหว่าง{activity}" },
+    { id: "shortage_changed", event: "shortage_changed", text: "คลัง{good}ของ{place}เปลี่ยนจาก \"{from}\" เป็น \"{to}\"" },
+    { id: "quest_posted", event: "quest_posted", text: "{issuer}ขอให้หา{item} {amount} หน่วยจาก{place}" },
+    { id: "omen_sent", event: "omen_sent", text: "กลุ่มดาวส่งลางเตือน{party_leader}ว่า{clue}" },
+  ],
+  balance: {
+    influence: { cap: 100, start: 60, regen_per_day: 10, max_per_event: 30 },
+    powers: { foresee: { name: "พยากรณ์", cost: 8, cd: 1, mvp: true }, omen: { name: "ส่งลาง", cost: 12, cd: 1, mvp: true }, blessing: { name: "ประทานพร", cost: 25, cd: 2, mvp: true }, gift: { name: "ของขวัญจากฟ้า", cost: 30, cd: 4, mvp: true }, protect: { name: "พิทักษ์", cost: 35, cd: 4, mvp: false }, crisis_intervention: { name: "แทรกแซงวิกฤต", cost: 50, cd: 12, mvp: false } },
+    npc: { need_urgent_on: 75, need_urgent_off: 35, memory_max_per_npc: 25 },
+    party_combat: { power_weight_combat_skill: 0.45, power_weight_equipment: 0.35, power_weight_health_ratio: 20, power_weight_role_synergy: 0.2, risk_ratio_low_below: 0.6, risk_ratio_medium_below: 1.0, risk_ratio_high_below: 1.5 },
+    economy: { target_stock_days: 7, price_exponent: 0.25, price_index_min: 0.6, price_index_max: 1.8, price_daily_change_max: 0.1, shop_buy_ratio: 0.9, shop_sell_ratio: 1.1 },
+    chronicle: { importance_timeline: 25, importance_notable: 50, importance_chronicle: 75, importance_era: 90 },
+  },
+};
+const clone = (o) => JSON.parse(JSON.stringify(o));
+const KEY = "star-studio-draft-v1";
+let S;
+try { S = JSON.parse(localStorage.getItem(KEY) || "null"); } catch (e) { S = null; }
+if (!S || !S.nodes) S = clone(DEFAULT);
+
+const ui = {
+  sec: "overview",
+  sel: { npc: "rena", monster: "shadow_wolf", good: "medicine", quest: "gather", template: "party_returned", world: { kind: "node", id: "lumen" } },
+  link: false, linkFrom: null, party: ["rena", "toma"],
+  sc: { food: 1, info: 40, fatigue: 30, threat: 55 },
+  stock: 9,
+  sim: { seed: 1234, days: 30, death: "warn", omen: true }, simResult: null,
+  confirm: null,
+};
+
+// ======================= constants =======================
+const ROLES = ["นักผจญภัย", "นักธนู", "ผู้รักษา", "ช่างตีเหล็ก", "พ่อค้า", "ชาวนา", "ยามรักษาการณ์"];
+const ADVENTURER_ROLES = ["นักผจญภัย", "นักธนู"];
+const TRAITS = { bravery: "กล้าหาญ", caution: "ระมัดระวัง", generosity: "ใจกว้าง", ambition: "ทะเยอทะยาน", sociability: "เข้าสังคม" };
+const SKILLS = { combat: "ต่อสู้", gathering: "เก็บของ", healing: "รักษา", crafting: "ช่างฝีมือ", negotiation: "เจรจา" };
+const NODE_TYPES = { village: "หมู่บ้าน", town: "เมือง", wild: "พื้นที่ป่า/ทรัพยากร", dungeon: "ดันเจียน" };
+const RISK = { low: "ต่ำ", mid: "กลาง", midhigh: "กลาง-สูง", high: "สูง" };
+const RISK_BONUS = { low: 0, mid: 10, midhigh: 20, high: 35 };
+const DANGER = { safe: "ปลอดภัย", watch: "ถูกเฝ้าระวัง", danger: "มีฝูงมอนสเตอร์" };
+const KINDS = { common: "ทั่วไป", pack: "ฝูง", rare: "หายาก", boss: "บอส" };
+const THREAT = { low: "ต่ำ", mid: "ปานกลาง", high: "สูง" };
+const EVENT_FIELDS = {
+  party_returned: { party_leader: "เรน่า", place: "ป่ารากเงิน", item: "ใบจันทร์ขาว", amount: 12, injured_note: " แม้โทมะบาดเจ็บเล็กน้อย" },
+  npc_injured: { npc: "โทมะ", severity: "เล็กน้อย", activity: "เดินทางกลับจากป่ารากเงิน" },
+  shortage_changed: { good: "ยา", place: "หมู่บ้านลูเมน", from: "วิกฤต", to: "ตึงตัว" },
+  quest_posted: { issuer: "มีรา", item: "ใบจันทร์ขาว", amount: 10, place: "ป่ารากเงิน" },
+  omen_sent: { party_leader: "เรน่า", clue: "มีรอยฝูงหมาป่าทางเหนือ" },
+};
+const EVENT_NAMES = { party_returned: "ปาร์ตี้กลับจากภารกิจ", npc_injured: "NPC บาดเจ็บ", shortage_changed: "ระดับสต็อกเปลี่ยน", quest_posted: "มีภารกิจใหม่", omen_sent: "กลุ่มดาวส่งลาง" };
+const SECTIONS = [
+  { grp: "โครงการ" }, { id: "overview", name: "ภาพรวม" },
+  { grp: "โลก" }, { id: "world", name: "แผนที่และเส้นทาง" }, { id: "npc", name: "ตัวละคร NPC" }, { id: "monster", name: "มอนสเตอร์" }, { id: "good", name: "สินค้าและราคา" },
+  { grp: "เรื่องราว" }, { id: "quest", name: "แม่แบบภารกิจ" }, { id: "crisis", name: "วิกฤตประจำบท" }, { id: "template", name: "แม่แบบพงศาวดาร" },
+  { grp: "ระบบ" }, { id: "power", name: "พลังกลุ่มดาว" }, { id: "balance", name: "ตัวเลข Balance" }, { id: "sim", name: "ทดสอบจำลอง" },
+];
+
+// ======================= helpers =======================
+const $ = (s, r = document) => r.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const byId = (arr, id) => arr.find((x) => x.id === id);
+const nodeName = (id) => (byId(S.nodes, id) || {}).name || "(ไม่พบสถานที่)";
+const opts = (pairs, cur) => pairs.map(([v, l]) => `<option value="${esc(v)}"${v === cur ? " selected" : ""}>${esc(l)}</option>`).join("");
+const nodeOpts = (cur) => opts(S.nodes.map((n) => [n.id, n.name]), cur);
+function getPath(o, p) { return p.split(".").reduce((a, k) => (a == null ? a : a[k]), o); }
+function setPath(o, p, v) { const ks = p.split("."); const last = ks.pop(); const t = ks.reduce((a, k) => a[k], o); t[last] = v; }
+let saveTimer = null;
+function save() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => { try { localStorage.setItem(KEY, JSON.stringify(S)); $("#saved").textContent = "บันทึกร่างแล้ว " + new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" }); } catch (e) { $("#saved").textContent = "บันทึกร่างไม่ได้ในเบราว์เซอร์นี้"; } }, 300);
+}
+function toast(msg) { const t = document.createElement("div"); t.className = "toast"; t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.remove(), 1600); }
+function newId(prefix, arr) { let i = arr.length + 1; while (byId(arr, prefix + i)) i++; return prefix + i; }
+const COLORS = {}; { const cs = getComputedStyle(document.documentElement); for (const k of ["bg", "surface", "surface-2", "line", "text", "muted", "gold", "ok", "warn", "bad", "blue"]) COLORS[k] = cs.getPropertyValue("--" + k).trim(); }
+
+// ======================= game rules (shared by previews + sim) =======================
+function riskLevel(r) { const B = S.balance.party_combat; return r < B.risk_ratio_low_below ? ["low", "ต่ำ"] : r < B.risk_ratio_medium_below ? ["mid", "ปานกลาง"] : r < B.risk_ratio_high_below ? ["high", "สูง"] : ["crit", "วิกฤต"]; }
+function partyPower(members, injured = {}) {
+  const B = S.balance.party_combat; const roles = new Set(members.map((m) => m.role));
+  const syn = roles.size > 1 ? 40 : 10;
+  return members.reduce((s, m) => s + m.skills.combat * B.power_weight_combat_skill + 40 * B.power_weight_equipment + (injured[m.id] ? 0.5 : 1) * B.power_weight_health_ratio + syn * B.power_weight_role_synergy, 0);
+}
+function monsterPower(mon) { const node = byId(S.nodes, mon.habitat); return mon.threat * ((mon.gmin + mon.gmax) / 2) + (node ? RISK_BONUS[node.risk] : 0); }
+function decide(n, sc) {
+  const T = n.traits, K = n.skills;
+  const risk = sc.threat * (1 - T.bravery / 200) * (1 - sc.info / 250);
+  const unprep = sc.food < 2 ? (2 - sc.food) * 15 : 0;
+  const options = [
+    { name: "รับภารกิจทันที", parts: [["ตรงเป้าหมายช่วยหมู่บ้าน", 35 + T.ambition * 0.15 + T.generosity * 0.1], ["ทักษะเก็บของเหมาะ", K.gathering * 0.15], ["ความเสี่ยงของเส้นทาง", -risk * 0.6], ["เสบียงยังไม่พร้อม", -unprep * 1.2], ["ความเหนื่อย", -sc.fatigue * 0.25]] },
+    { name: "เตรียมของก่อน", parts: [["ตรงเป้าหมายช่วยหมู่บ้าน", 28 + T.generosity * 0.08], ["ต้องเตรียมเสบียง", unprep * 1.4 + 8], ["นิสัยระมัดระวัง", T.caution * 0.18], ["ความเสี่ยงของเส้นทาง", -risk * 0.45], ["เสียเวลา", -10]] },
+    { name: "พักหนึ่งช่วง", parts: [["ได้พักฟื้น", sc.fatigue * 0.55], ["นิสัยระมัดระวัง", T.caution * 0.08], ["เสียเวลา", -18], ["ยังคืบหน้าเป้าหมาย", 5]] },
+    { name: "ปฏิเสธภารกิจ", parts: [["เลี่ยงภัย", risk * 0.5 * (T.caution / 100)], ["ขัดเป้าหมายช่วยหมู่บ้าน", -(25 + T.generosity * 0.15)]] },
+  ];
+  for (const o of options) o.score = o.parts.reduce((s, p) => s + p[1], 0);
+  options.sort((a, b) => b.score - a.score);
+  const best = options[0];
+  const pos = best.parts.filter((p) => p[1] > 0).sort((a, b) => b[1] - a[1]).slice(0, 2).map((p) => p[0]);
+  const neg = options.find((o) => o.name === "รับภารกิจทันที").parts.filter((p) => p[1] < -5).sort((a, b) => a[1] - b[1]).slice(0, 1).map((p) => p[0]);
+  return { options, best, reason: `${n.name}เลือก "${best.name}" เพราะ${pos.join(" และ")}${neg.length && best.name !== "รับภารกิจทันที" ? ` (ถ้าออกทันที ติดที่${neg[0]})` : ""}` };
+}
+function priceIndex(stock, target) { const E = S.balance.economy; return clamp(Math.pow(target / Math.max(stock, 1), E.price_exponent), E.price_index_min, E.price_index_max); }
+function fillTemplate(text, facts) { return text.replace(/\{(\w+)\}/g, (m, k) => (k in facts ? facts[k] : m)); }
+
+// ======================= validation =======================
+function issues() {
+  const out = []; const nodeIds = new Set(S.nodes.map((n) => n.id)); const npcIds = new Set(S.npcs.map((n) => n.id));
+  for (const r of S.routes) {
+    if (!nodeIds.has(r.a) || !nodeIds.has(r.b)) out.push({ sec: "world", id: r.id, kind: "route", msg: `เส้นทาง ${r.id} ชี้ไปสถานที่ที่ไม่มีแล้ว` });
+    if (r.a === r.b) out.push({ sec: "world", id: r.id, kind: "route", msg: `เส้นทาง ${r.id} เริ่มและจบที่เดียวกัน` });
+  }
+  for (const n of S.nodes) if (!S.routes.some((r) => r.a === n.id || r.b === n.id)) out.push({ sec: "world", id: n.id, kind: "node", msg: `${n.name} ไม่มีเส้นทางเชื่อม NPC เดินทางไปไม่ได้` });
+  for (const n of S.npcs) {
+    if (!n.name.trim()) out.push({ sec: "npc", id: n.id, msg: `NPC ${n.id} ยังไม่มีชื่อ` });
+    if (!nodeIds.has(n.home)) out.push({ sec: "npc", id: n.id, msg: `${n.name}: บ้านอยู่ในสถานที่ที่ไม่มีแล้ว` });
+    for (const r of n.rel) { if (!npcIds.has(r.to)) out.push({ sec: "npc", id: n.id, msg: `${n.name}: มีความสัมพันธ์กับ NPC ที่ถูกลบไปแล้ว` }); if (r.to === n.id) out.push({ sec: "npc", id: n.id, msg: `${n.name}: ความสัมพันธ์ชี้หาตัวเอง` }); }
+  }
+  for (const m of S.monsters) { if (!nodeIds.has(m.habitat)) out.push({ sec: "monster", id: m.id, msg: `${m.name}: ถิ่นอาศัยไม่มีในแผนที่` }); if (m.gmin > m.gmax) out.push({ sec: "monster", id: m.id, msg: `${m.name}: จำนวนต่ำสุดมากกว่าสูงสุด` }); }
+  for (const q of S.quests) if (!nodeIds.has(q.dest)) out.push({ sec: "quest", id: q.id, msg: `${q.name}: จุดหมายไม่มีในแผนที่` });
+  if (S.crisis.outcomes.length < 3) out.push({ sec: "crisis", msg: `วิกฤตต้องมีผลลัพธ์อย่างน้อย 3 แนวทาง (ตอนนี้มี ${S.crisis.outcomes.length})` });
+  for (const t of S.templates) { const allowed = EVENT_FIELDS[t.event] || {}; const bad = [...t.text.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).filter((k) => !(k in allowed)); if (bad.length) out.push({ sec: "template", id: t.id, msg: `แม่แบบ ${t.id}: ใช้ช่องที่เหตุการณ์นี้ไม่มี {${bad.join("}, {")}}` }); }
+  if (!S.goods.some((g) => g.id === "medicine")) out.push({ sec: "good", msg: "ไม่มีสินค้า 'ยา' (medicine) ซึ่งวิกฤตและระบบจำลองต้องใช้" });
+  return out;
+}
+
+// ======================= nav + top =======================
+function renderNav() {
+  const iss = issues(); const counts = {
+    world: `${S.nodes.length}·${S.routes.length}`, npc: S.npcs.length, monster: S.monsters.length, good: S.goods.length, quest: S.quests.length, crisis: S.crisis.outcomes.length + " ผล", template: S.templates.length, power: Object.keys(S.balance.powers).length,
+  };
+  $("#nav").innerHTML = SECTIONS.map((s) => {
+    if (s.grp) return `<div class="grp">${s.grp}</div>`;
+    const n = iss.filter((i) => i.sec === s.id).length;
+    return `<button type="button" data-sec="${s.id}"${ui.sec === s.id ? ' aria-current="page"' : ""}><span>${s.name}</span><span class="count${n ? " bad" : ""}">${n ? "⚠ " + n : counts[s.id] ?? ""}</span></button>`;
+  }).join("");
+  const pill = $("#issues-pill");
+  pill.className = "pill " + (iss.length ? "bad" : "ok");
+  pill.textContent = iss.length ? `⚠ ต้องแก้ ${iss.length} จุด` : "✓ ข้อมูลครบถ้วน";
+}
+$("#nav").addEventListener("click", (e) => { const b = e.target.closest("[data-sec]"); if (b) go(b.dataset.sec); });
+$("#issues-pill").addEventListener("click", () => go("overview"));
+function go(sec, sel) { ui.sec = sec; if (sel) { if (sec === "world") ui.sel.world = sel; else ui.sel[sec] = sel; } ui.confirm = null; render(); $("#main").scrollTop = 0; try { history.replaceState(null, "", "#" + sec); } catch (e) {} }
+
+// ======================= sections =======================
+function head(title, desc) { return `<div class="head"><h1>${title}</h1><p>${desc}</p></div>`; }
+function listHTML(sec, arr, sub) {
+  const bad = new Set(issues().filter((i) => i.sec === sec).map((i) => i.id));
+  return `<div class="list" role="listbox" aria-label="รายการ">${arr.map((x) => `<button type="button" class="item" role="option" data-pick="${esc(x.id)}" aria-selected="${ui.sel[sec] === x.id}">${x.color ? `<span class="dot" style="background:${esc(x.color)}"></span>` : ""}<span data-label="${esc(x.id)}">${esc(x.name || "(ไม่มีชื่อ)")}</span>${bad.has(x.id) ? '<span class="warnmark">⚠</span>' : ""}<small>${esc(sub(x))}</small></button>`).join("")}</div>`;
+}
+function delButton(key) { return ui.confirm === key ? `<button type="button" class="btn danger" data-act="confirm-del">ยืนยันลบ</button><button type="button" class="btn" data-act="cancel-del">ยกเลิก</button>` : `<button type="button" class="btn danger" data-act="ask-del" data-key="${key}">ลบ</button>`; }
+const field = (label, input, full) => `<label class="f${full ? " full" : ""}">${label}${input}</label>`;
+const txt = (col, id, f, v) => `<input type="text" id="${col}-${id}-${f}" data-col="${col}" data-id="${esc(id)}" data-field="${f}" value="${esc(v)}">`;
+const num = (col, id, f, v, step = 1) => `<input type="number" id="${col}-${id}-${f}" step="${step}" data-col="${col}" data-id="${esc(id)}" data-field="${f}" data-num="1" value="${esc(v)}">`;
+const sel = (col, id, f, optionsHTML) => `<select id="${col}-${id}-${f}" data-col="${col}" data-id="${esc(id)}" data-field="${f}">${optionsHTML}</select>`;
+const area = (col, id, f, v) => `<textarea id="${col}-${id}-${f}" data-col="${col}" data-id="${esc(id)}" data-field="${f}">${esc(v)}</textarea>`;
+const slider = (col, id, f, label, v) => `<div class="slider"><span>${label}</span><input type="range" min="0" max="100" id="${col}-${id}-${f}" data-col="${col}" data-id="${esc(id)}" data-field="${f}" data-num="1" value="${v}" aria-label="${label}"><output data-out="${col}-${id}-${f}">${v}</output></div>`;
+
+// ---------- overview ----------
+function secOverview() {
+  const iss = issues();
+  const scope = [
+    ["สถานที่", S.nodes.length, 5, "GDD 15.1: 1 ภูมิภาค 5 โหนด"], ["เส้นทาง", S.routes.length, 7, "ไม่เกิน 7 เส้น"], ["NPC สำคัญ", S.npcs.length, 12, "ประมาณ 12 คน"],
+    ["มอนสเตอร์", S.monsters.length, 4, "3 ประเภท + บอส 1"], ["แม่แบบภารกิจ", S.quests.length, 5, "5 ประเภท"], ["ผลลัพธ์วิกฤต", S.crisis.outcomes.length, 3, "อย่างน้อย 3 แนวทาง", true],
+  ];
+  return head("ภาพรวมโครงการ", "Studio สำหรับสร้างทุกอย่างในเกม: แผนที่ NPC มอนสเตอร์ สินค้า ภารกิจ วิกฤต พงศาวดาร พลัง และตัวเลข แล้วกดทดสอบจำลองดูผลได้ทันที ทุกหน้าบันทึกเป็นไฟล์ JSON ที่ Godot อ่านได้โดยตรง") + `
+  <div class="stack">
+    <div class="card"><h2>ขอบเขต MVP</h2><div class="scope">${scope.map(([l, v, lim, note, atLeast]) => { const over = atLeast ? v < lim : v > lim; return `<div class="kpi"><span>${l}</span><b style="color:${over ? COLORS.bad : COLORS.text}">${v}</b> <small>/ ${atLeast ? "≥" : "≤"}${lim}</small><br><small>${note}</small></div>`; }).join("")}</div></div>
+    <div class="card"><h2>${iss.length ? `ต้องแก้ ${iss.length} จุดก่อนส่งให้เกม` : "ข้อมูลครบถ้วน พร้อมส่งให้เกม"}</h2>
+      ${iss.length ? `<div class="issues">${iss.map((i) => `<button type="button" data-goto="${i.sec}" data-goto-id="${esc(i.id || "")}" data-goto-kind="${i.kind || ""}">⚠ ${esc(i.msg)}</button>`).join("")}</div>` : '<p class="muted">ไม่มีการอ้างอิงที่ขาดหาย ทุกสถานที่มีเส้นทาง ทุกแม่แบบใช้ช่องข้อมูลที่มีจริง</p>'}
+    </div>
+    <div class="card"><h2>Studio ทำงานกับเกมอย่างไร</h2>
+      <p class="muted" style="max-width:70ch;margin:0">แก้ข้อมูลในแต่ละหน้า → Studio ตรวจการอ้างอิงให้ทันที → ไปหน้า "ทดสอบจำลอง" เพื่อรันโลก 30 วันด้วย seed เดิมแล้วดูพงศาวดารที่เกิดขึ้น → พอใจแล้วส่งออก JSON (ปุ่ม "ดู JSON") ไปไว้ที่ <span class="mono">data/</span> ใน repo ให้ Godot โหลดตอนเริ่มเกม</p>
+    </div>
+  </div>`;
+}
+
+// ---------- world ----------
+function secWorld() {
+  const s = ui.sel.world; const node = s.kind === "node" ? byId(S.nodes, s.id) : null; const route = s.kind === "route" ? byId(S.routes, s.id) : null;
+  let insp = '<p class="muted">คลิกสถานที่หรือเส้นทางบนแผนที่เพื่อแก้ไข</p>';
+  if (node) insp = `<h2>${esc(node.name)}</h2><div class="fields">
+      ${field("ชื่อ", txt("nodes", node.id, "name", node.name), true)}
+      ${field("ชนิด", sel("nodes", node.id, "type", opts(Object.entries(NODE_TYPES), node.type)))}
+      ${field("ความเสี่ยง", sel("nodes", node.id, "risk", opts(Object.entries(RISK), node.risk)))}
+      ${field("ทรัพยากร/กิจกรรม", txt("nodes", node.id, "res", node.res), true)}</div>
+      <p class="note">มอนสเตอร์ที่อาศัยอยู่: ${S.monsters.filter((m) => m.habitat === node.id).map((m) => esc(m.name)).join(", ") || "ไม่มี"} · NPC ที่มีบ้านที่นี่: ${S.npcs.filter((n) => n.home === node.id).length} คน</p>
+      <div class="row-actions">${delButton("node:" + node.id)}</div>`;
+  if (route) insp = `<h2>เส้นทาง ${esc(nodeName(route.a))} ↔ ${esc(nodeName(route.b))}</h2><div class="fields">
+      ${field("จาก", sel("routes", route.id, "a", nodeOpts(route.a)))}${field("ถึง", sel("routes", route.id, "b", nodeOpts(route.b)))}
+      ${field("ระยะเดินทาง (วันเกม)", num("routes", route.id, "days", route.days, 0.5))}
+      ${field("สถานะ", sel("routes", route.id, "danger", opts(Object.entries(DANGER), route.danger)))}
+      ${field("หมายเหตุ / ข่าวลือ", txt("routes", route.id, "note", route.note), true)}</div>
+      <div class="row-actions">${delButton("route:" + route.id)}</div>`;
+  return head("แผนที่และเส้นทาง", "วางสถานที่และเส้นทางของภูมิภาค ลากเพื่อย้ายตำแหน่ง ตำแหน่งบนแผนที่นี้ใช้วางพื้นที่ในโลก 3D และคำนวณเวลาเดินทาง") + `
+  <div class="work two"><div class="card">
+    <div class="maptools"><button type="button" class="btn" data-act="add-node">+ สถานที่</button><button type="button" class="btn" data-act="link" aria-pressed="${ui.link}">${ui.link ? (ui.linkFrom ? "คลิกปลายทาง…" : "คลิกจุดเริ่มต้น…") : "+ เส้นทาง"}</button>
+      <span class="note">เส้นทึบ = ปลอดภัย · เส้นประ = เฝ้าระวัง · สีส้ม = มีฝูงมอนสเตอร์</span></div>
+    <div class="mapwrap"><canvas class="map" id="map" aria-label="แผนที่ภูมิภาค"></canvas></div></div>
+    <div class="card preview">${insp}</div></div>`;
+}
+function drawMap() {
+  const cv = $("#map"); if (!cv) return;
+  const d = Math.min(window.devicePixelRatio || 1, 2), w = cv.clientWidth, h = cv.clientHeight;
+  cv.width = w * d; cv.height = h * d; const c = cv.getContext("2d"); c.setTransform(d, 0, 0, d, 0, 0);
+  const k = w / 1000; c.clearRect(0, 0, w, h);
+  c.strokeStyle = COLORS.line; c.lineWidth = 1; c.globalAlpha = 0.4;
+  for (let x = 0; x <= 1000; x += 100) { c.beginPath(); c.moveTo(x * k, 0); c.lineTo(x * k, h); c.stroke(); }
+  for (let y = 0; y <= 600; y += 100) { c.beginPath(); c.moveTo(0, y * k); c.lineTo(w, y * k); c.stroke(); }
+  c.globalAlpha = 1;
+  const pairs = {};
+  for (const r of S.routes) {
+    const a = byId(S.nodes, r.a), b = byId(S.nodes, r.b); if (!a || !b) continue;
+    const key = [r.a, r.b].sort().join("|"); const idx = (pairs[key] = (pairs[key] || 0) + 1) - 1;
+    const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, nx = -(b.y - a.y), ny = b.x - a.x, nl = Math.hypot(nx, ny) || 1, off = idx * 70;
+    const cx = mx + (nx / nl) * off, cy = my + (ny / nl) * off;
+    const selR = ui.sel.world.kind === "route" && ui.sel.world.id === r.id;
+    c.beginPath(); c.moveTo(a.x * k, a.y * k); c.quadraticCurveTo(cx * k, cy * k, b.x * k, b.y * k);
+    c.setLineDash(r.danger === "watch" ? [7, 6] : r.danger === "danger" ? [3, 5] : []);
+    c.strokeStyle = r.danger === "danger" ? COLORS.bad : COLORS.gold; c.globalAlpha = r.danger === "safe" ? 0.8 : 0.95; c.lineWidth = selR ? 4 : 2; c.stroke(); c.setLineDash([]); c.globalAlpha = 1;
+    const lx = (a.x + 2 * cx + b.x) / 4, ly = (a.y + 2 * cy + b.y) / 4; r._lx = lx; r._ly = ly;
+    c.fillStyle = COLORS.surface; c.beginPath(); c.arc(lx * k, ly * k, 11, 0, Math.PI * 2); c.fill();
+    c.fillStyle = COLORS.text; c.font = "600 11px Sarabun, sans-serif"; c.textAlign = "center"; c.textBaseline = "middle"; c.fillText(r.days + "ว", lx * k, ly * k);
+  }
+  for (const n of S.nodes) {
+    const selN = ui.sel.world.kind === "node" && ui.sel.world.id === n.id, linkN = ui.linkFrom === n.id;
+    const r = n.type === "village" || n.type === "town" ? 12 : 10;
+    const g = c.createRadialGradient(n.x * k, n.y * k, 0, n.x * k, n.y * k, r * 3); g.addColorStop(0, "rgba(227,191,99,0.55)"); g.addColorStop(1, "rgba(227,191,99,0)");
+    c.fillStyle = g; c.beginPath(); c.arc(n.x * k, n.y * k, r * 3, 0, Math.PI * 2); c.fill();
+    c.fillStyle = n.risk === "high" ? COLORS.bad : n.risk === "midhigh" || n.risk === "mid" ? COLORS.warn : COLORS.ok;
+    c.beginPath(); c.arc(n.x * k, n.y * k, r * 0.6, 0, Math.PI * 2); c.fill();
+    if (selN || linkN) { c.strokeStyle = COLORS.gold; c.lineWidth = 2; c.beginPath(); c.arc(n.x * k, n.y * k, r + 4, 0, Math.PI * 2); c.stroke(); }
+    c.fillStyle = COLORS.text; c.font = "600 13px Sarabun, sans-serif"; c.textAlign = "center"; c.textBaseline = "bottom"; c.fillText(n.name, n.x * k, n.y * k - r - 4);
+    c.fillStyle = COLORS.muted; c.font = "11px Sarabun, sans-serif"; c.textBaseline = "top"; c.fillText(NODE_TYPES[n.type] + " · เสี่ยง" + RISK[n.risk], n.x * k, n.y * k + r + 3);
+  }
+}
+let mapDrag = null;
+function mapPoint(e) { const cv = $("#map"), r = cv.getBoundingClientRect(), k = r.width / 1000; return { x: (e.clientX - r.left) / k, y: (e.clientY - r.top) / k }; }
+function hitMap(p) {
+  for (const n of S.nodes) if (Math.hypot(n.x - p.x, n.y - p.y) < 24) return { kind: "node", id: n.id };
+  for (const r of S.routes) if (r._lx != null && Math.hypot(r._lx - p.x, r._ly - p.y) < 22) return { kind: "route", id: r.id };
+  return null;
+}
+document.addEventListener("pointerdown", (e) => {
+  if (e.target.id !== "map") return; const p = mapPoint(e), hit = hitMap(p);
+  if (ui.link) {
+    if (hit && hit.kind === "node") {
+      if (!ui.linkFrom) { ui.linkFrom = hit.id; render(); return; }
+      if (hit.id !== ui.linkFrom) { const id = newId("r", S.routes); S.routes.push({ id, a: ui.linkFrom, b: hit.id, days: 1, danger: "safe", note: "" }); ui.link = false; ui.linkFrom = null; ui.sel.world = { kind: "route", id }; changed(true); }
+    }
+    return;
+  }
+  if (hit) { ui.sel.world = hit; if (hit.kind === "node") { mapDrag = { id: hit.id, moved: false }; e.target.setPointerCapture(e.pointerId); } render(); }
+});
+document.addEventListener("pointermove", (e) => {
+  if (!mapDrag || e.target.id !== "map") return; const n = byId(S.nodes, mapDrag.id); if (!n) return;
+  const p = mapPoint(e); n.x = Math.round(clamp(p.x, 20, 980)); n.y = Math.round(clamp(p.y, 30, 570)); mapDrag.moved = true; drawMap();
+});
+document.addEventListener("pointerup", () => { if (mapDrag && mapDrag.moved) save(); mapDrag = null; });
+
+// ---------- NPC ----------
+function secNPC() {
+  const n = byId(S.npcs, ui.sel.npc) || S.npcs[0]; if (n) ui.sel.npc = n.id;
+  const left = listHTML("npc", S.npcs, (x) => x.role) + `<div class="row-actions"><button type="button" class="btn" data-act="add-npc">+ NPC</button></div>`;
+  if (!n) return head("ตัวละคร NPC", "") + `<div class="work"><div>${left}</div></div>`;
+  const others = S.npcs.filter((x) => x.id !== n.id);
+  const relRows = n.rel.map((r, i) => `<tr><td><select id="rel-${n.id}-${i}-to" data-rel="${i}" data-rf="to">${opts(S.npcs.map((x) => [x.id, x.name]), r.to)}</select></td>${["trust", "affinity", "respect", "grievance"].map((f) => `<td><input type="number" min="0" max="100" id="rel-${n.id}-${i}-${f}" data-rel="${i}" data-rf="${f}" value="${r[f]}"></td>`).join("")}<td><input type="text" id="rel-${n.id}-${i}-why" data-rel="${i}" data-rf="why" value="${esc(r.why)}"></td><td><button type="button" class="btn small danger" data-act="del-rel" data-i="${i}" aria-label="ลบความสัมพันธ์">✕</button></td></tr>`).join("");
+  return head("ตัวละคร NPC", "กำหนดบุคลิก ทักษะ เป้าหมาย และความสัมพันธ์ แล้วดูทันทีว่า NPC จะตัดสินใจอย่างไรในสถานการณ์ทดสอบ (สูตรตัวอย่างตามภาคผนวก AI ข้อ 7)") + `
+  <div class="work"><div>${left}</div>
+  <div class="stack">
+    <div class="card"><h3>ข้อมูลพื้นฐาน</h3><div class="fields">
+      ${field("ชื่อ", txt("npcs", n.id, "name", n.name))}${field("อาชีพ/บทบาท", sel("npcs", n.id, "role", opts(ROLES.map((r) => [r, r]), n.role)))}
+      ${field("บ้าน", sel("npcs", n.id, "home", nodeOpts(n.home)))}${field("สีประจำตัว", `<input type="color" id="npcs-${n.id}-color" data-col="npcs" data-id="${n.id}" data-field="color" value="${esc(n.color)}">`)}
+      ${field("เป้าหมายระยะสั้น", txt("npcs", n.id, "goalShort", n.goalShort), true)}${field("เป้าหมายระยะยาว", txt("npcs", n.id, "goalLong", n.goalLong), true)}</div></div>
+    <div class="card"><h3>บุคลิก (0–100)</h3>${Object.entries(TRAITS).map(([k, l]) => slider("npcs", n.id, "traits." + k, l, n.traits[k])).join("")}
+      <h3>ทักษะ (0–100)</h3>${Object.entries(SKILLS).map(([k, l]) => slider("npcs", n.id, "skills." + k, l, n.skills[k])).join("")}</div>
+    <div class="card"><h3>ความสัมพันธ์ (มีทิศทาง: ${esc(n.name)} รู้สึกต่อคนอื่น)</h3>
+      <div class="tablewrap"><table><thead><tr><th>ต่อ</th><th>ไว้ใจ</th><th>ชอบ</th><th>เคารพ</th><th>คับข้องใจ</th><th>เพราะ</th><th></th></tr></thead><tbody>${relRows || '<tr><td colspan="7" class="muted">ยังไม่มีความสัมพันธ์</td></tr>'}</tbody></table></div>
+      <div class="row-actions">${others.length ? '<button type="button" class="btn" data-act="add-rel">+ ความสัมพันธ์</button>' : ""}${delButton("npc:" + n.id)}</div></div>
+  </div>
+  <div class="card preview"><h2>ทดสอบการตัดสินใจ</h2><p class="note" style="margin:0 0 10px">สถานการณ์: ได้รับคำขอให้ไปเก็บสมุนไพรที่ป่ารากเงิน</p>
+    ${scSlider("food", "เสบียง (วัน)", 0, 4, 0.5)}${scSlider("info", "ข้อมูลภัยที่รู้", 0, 100, 5)}${scSlider("fatigue", "ความเหนื่อย", 0, 100, 5)}${scSlider("threat", "ภัยในป่า", 0, 100, 5)}
+    <div id="npc-preview" style="margin-top:12px"></div></div>
+  </div>`;
+}
+const scSlider = (k, l, mn, mx, st) => `<div class="slider"><span>${l}</span><input type="range" min="${mn}" max="${mx}" step="${st}" id="sc-${k}" data-sc="${k}" value="${ui.sc[k]}" aria-label="${l}"><output data-out="sc-${k}">${ui.sc[k]}</output></div>`;
+function npcPreview() {
+  const el = $("#npc-preview"); const n = byId(S.npcs, ui.sel.npc); if (!el || !n) return;
+  const d = decide(n, ui.sc); const max = Math.max(...d.options.map((o) => Math.abs(o.score)), 1);
+  el.innerHTML = `<div class="bars">${d.options.map((o, i) => `<div class="bar${i === 0 ? " win" : ""}"><span>${o.name}</span><div class="track"><div class="fill" style="width:${clamp((o.score / max) * 100, 2, 100)}%"></div></div><b>${o.score.toFixed(0)}</b></div>`).join("")}</div>
+    <div class="why">${esc(d.reason)}</div><p class="note">ข้อความนี้คือ "เหตุผลการกระทำล่าสุด" ที่ผู้เล่นจะเห็นในหน้าต่าง NPC ในเกม ลองเลื่อนบุคลิก "ระมัดระวัง" หรือ "กล้าหาญ" แล้วดูว่าการตัดสินใจเปลี่ยนไหม</p>`;
+}
+
+// ---------- monsters ----------
+function secMonster() {
+  const m = byId(S.monsters, ui.sel.monster) || S.monsters[0]; if (m) ui.sel.monster = m.id;
+  const left = listHTML("monster", S.monsters, (x) => KINDS[x.kind]) + `<div class="row-actions"><button type="button" class="btn" data-act="add-monster">+ มอนสเตอร์</button></div>`;
+  if (!m) return head("มอนสเตอร์", "") + `<div class="work"><div>${left}</div></div>`;
+  return head("มอนสเตอร์", "กำหนดค่าภัย จำนวนในฝูง และถิ่นอาศัย แล้วเลือกสมาชิกปาร์ตี้เพื่อดูระดับความเสี่ยงที่ผู้เล่นจะเห็นก่อนออกภารกิจ (สูตร GDD เจาะลึก 8.3)") + `
+  <div class="work"><div>${left}</div>
+  <div class="card"><div class="fields">
+    ${field("ชื่อ", txt("monsters", m.id, "name", m.name))}${field("ประเภท", sel("monsters", m.id, "kind", opts(Object.entries(KINDS), m.kind)))}
+    ${field("ถิ่นอาศัย", sel("monsters", m.id, "habitat", nodeOpts(m.habitat)))}${field("ค่าภัยต่อตัว", num("monsters", m.id, "threat", m.threat))}
+    ${field("จำนวนต่ำสุด", num("monsters", m.id, "gmin", m.gmin))}${field("จำนวนสูงสุด", num("monsters", m.id, "gmax", m.gmax))}
+    ${field("พฤติกรรมเฉพาะ", txt("monsters", m.id, "behavior", m.behavior), true)}${field("ของที่ได้", txt("monsters", m.id, "drops", m.drops), true)}</div>
+    <div class="row-actions">${delButton("monster:" + m.id)}</div></div>
+  <div class="card preview"><h2>ความเสี่ยงเมื่อเจอปาร์ตี้</h2><p class="note" style="margin:0 0 8px">เลือกสมาชิกปาร์ตี้ (2–4 คน)</p>
+    <div style="display:flex;flex-wrap:wrap;gap:6px 12px">${S.npcs.map((n) => `<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="party-${n.id}" data-party="${n.id}"${ui.party.includes(n.id) ? " checked" : ""}>${esc(n.name)}</label>`).join("")}</div>
+    <div id="mon-preview" style="margin-top:12px"></div></div></div>`;
+}
+function monPreview() {
+  const el = $("#mon-preview"); const m = byId(S.monsters, ui.sel.monster); if (!el || !m) return;
+  const members = ui.party.map((id) => byId(S.npcs, id)).filter(Boolean);
+  if (!members.length) { el.innerHTML = '<p class="muted">เลือกสมาชิกอย่างน้อย 1 คน</p>'; return; }
+  const pp = partyPower(members), mp = monsterPower(m), r = mp / Math.max(pp, 1), [cls, lbl] = riskLevel(r);
+  const desc = { low: "มีแนวโน้มชนะโดยบาดเจ็บเล็กน้อย", mid: "มีโอกาสบาดเจ็บหรือเสียทรัพยากร", high: "มีโอกาสถอยหรือสมาชิกบาดเจ็บหนัก", crit: "เสี่ยงเสียชีวิต/ล้มเหลว ต้องเตือนผู้เล่นชัดเจน" }[cls];
+  el.innerHTML = `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span class="chip ${cls}" style="font-size:0.9rem;padding:2px 12px">เสี่ยง${lbl}</span><span class="muted">${desc}</span></div>
+    <table style="margin-top:10px"><tbody><tr><td>พลังปาร์ตี้</td><td class="mono">${pp.toFixed(0)}</td></tr><tr><td>พลังมอนสเตอร์ (ค่าภัย × จำนวนเฉลี่ย + ภูมิประเทศ)</td><td class="mono">${mp.toFixed(0)}</td></tr><tr><td>risk_ratio</td><td class="mono">${r.toFixed(2)}</td></tr></tbody></table>
+    <p class="note">เกณฑ์ระดับมาจากหน้า "ตัวเลข Balance" (ต่ำ < ${S.balance.party_combat.risk_ratio_low_below} · ปานกลาง < ${S.balance.party_combat.risk_ratio_medium_below} · สูง < ${S.balance.party_combat.risk_ratio_high_below})</p>`;
+}
+
+// ---------- goods ----------
+function secGood() {
+  const g = byId(S.goods, ui.sel.good) || S.goods[0]; if (g) ui.sel.good = g.id;
+  const left = listHTML("good", S.goods, (x) => x.base + " ฿") + `<div class="row-actions"><button type="button" class="btn" data-act="add-good">+ สินค้า</button></div>`;
+  if (!g) return head("สินค้าและราคา", "") + `<div class="work"><div>${left}</div></div>`;
+  return head("สินค้าและราคา", "เศรษฐกิจแบบย่อระดับชุมชน (D6) ราคาขึ้นลงตามสต็อกตามสูตรในภาคผนวกเศรษฐกิจ 7.2 และมีเพดานต่ำสุด/สูงสุด") + `
+  <div class="work"><div>${left}</div>
+  <div class="card"><div class="fields">
+    ${field("ชื่อ", txt("goods", g.id, "name", g.name))}${field("หมวด", txt("goods", g.id, "cat", g.cat))}
+    ${field("ราคาฐาน (เหรียญ)", num("goods", g.id, "base", g.base, 0.5))}${field("อายุสินค้า (วัน)", num("goods", g.id, "shelf", g.shelf))}
+    ${field("ใช้ต่อวันในหมู่บ้าน", num("goods", g.id, "daily", g.daily, 0.1))}${field("สินค้าทดแทน", sel("goods", g.id, "sub", `<option value="">ไม่มี</option>` + opts(S.goods.filter((x) => x.id !== g.id).map((x) => [x.id, x.name]), g.sub)))}</div>
+    <p class="note">สต็อกเป้าหมาย = ใช้ต่อวัน × ${S.balance.economy.target_stock_days} วัน = <b>${(g.daily * S.balance.economy.target_stock_days).toFixed(1)}</b> หน่วย</p>
+    <div class="row-actions">${delButton("good:" + g.id)}</div></div>
+  <div class="card preview"><h2>ราคาตามสต็อก</h2>
+    <div class="slider"><span>สต็อกตอนนี้</span><input type="range" min="0" max="${Math.max(2, Math.ceil(g.daily * S.balance.economy.target_stock_days * 2))}" step="0.5" id="stock-now" data-stock="1" value="${ui.stock}" aria-label="สต็อกตอนนี้"><output data-out="stock-now">${ui.stock}</output></div>
+    <canvas class="chart" id="price-chart"></canvas><div id="good-preview"></div></div></div>`;
+}
+function goodPreview() {
+  const g = byId(S.goods, ui.sel.good); const el = $("#good-preview"); if (!g || !el) return;
+  const target = g.daily * S.balance.economy.target_stock_days, E = S.balance.economy;
+  const xs = [], ys = []; const max = Math.max(2, target * 2);
+  for (let i = 0; i <= 60; i++) { const s = (max * i) / 60; xs.push(s); ys.push(g.base * priceIndex(s, target)); }
+  const p = g.base * priceIndex(ui.stock, target);
+  chart($("#price-chart"), { xs, ys, ymin: 0, ymax: g.base * E.price_index_max * 1.1, color: COLORS.gold, mark: { x: ui.stock, y: p }, vline: { x: target, label: "เป้าหมาย" }, ylab: (v) => v.toFixed(0), xlab: (v) => v.toFixed(0) });
+  el.innerHTML = `<table><tbody><tr><td>ราคาอ้างอิง</td><td class="mono">${p.toFixed(1)}</td></tr><tr><td>ร้านขายให้ NPC (×${E.shop_sell_ratio})</td><td class="mono">${(p * E.shop_sell_ratio).toFixed(1)}</td></tr><tr><td>ร้านรับซื้อ (×${E.shop_buy_ratio})</td><td class="mono">${(p * E.shop_buy_ratio).toFixed(1)}</td></tr></tbody></table>
+    <p class="note">ในเกมราคาเปลี่ยนได้ไม่เกิน ±${Math.round(E.price_daily_change_max * 100)}% ต่อวัน แม้สต็อกจะเปลี่ยนกะทันหัน</p>`;
+}
+
+// ---------- quests ----------
+function secQuest() {
+  const q = byId(S.quests, ui.sel.quest) || S.quests[0]; if (q) ui.sel.quest = q.id;
+  const left = listHTML("quest", S.quests, (x) => THREAT[x.threat]) + `<div class="row-actions"><button type="button" class="btn" data-act="add-quest">+ แม่แบบ</button></div>`;
+  if (!q) return head("แม่แบบภารกิจ", "") + `<div class="work"><div>${left}</div></div>`;
+  return head("แม่แบบภารกิจ", "ภารกิจต้องเกิดจากสถานะโลก ไม่สุ่มขึ้นมาเอง (GDD เจาะลึก 7.2) กำหนดเงื่อนไขที่ทำให้เกิด ผู้มอบ จุดหมาย และผลที่ตามมา") + `
+  <div class="work"><div>${left}</div>
+  <div class="card"><div class="fields">
+    ${field("ชื่อแม่แบบ", txt("quests", q.id, "name", q.name), true)}
+    ${field("เกิดเมื่อ (เงื่อนไขในโลก)", txt("quests", q.id, "trigger", q.trigger), true)}
+    ${field("ผู้มอบ (อาชีพ)", sel("quests", q.id, "issuer", opts(ROLES.map((r) => [r, r]), q.issuer)))}${field("จุดหมาย", sel("quests", q.id, "dest", nodeOpts(q.dest)))}
+    ${field("ระดับภัยที่ทราบ", sel("quests", q.id, "threat", opts(Object.entries(THREAT), q.threat)))}${field("รางวัล (จ่ายจากงบที่มีจริง)", txt("quests", q.id, "reward", q.reward))}
+    ${field("เงื่อนไขสำเร็จ", txt("quests", q.id, "success", q.success))}${field("เงื่อนไขล้มเหลว", txt("quests", q.id, "fail", q.fail))}
+    ${field("ผลต่อโลก", txt("quests", q.id, "effect", q.effect), true)}</div>
+    <div class="row-actions">${delButton("quest:" + q.id)}</div></div>
+  <div class="card preview"><h2>การ์ดภารกิจที่ผู้เล่นเห็น</h2><div id="quest-preview"></div></div></div>`;
+}
+function questPreview() {
+  const q = byId(S.quests, ui.sel.quest); const el = $("#quest-preview"); if (!q || !el) return;
+  const issuer = S.npcs.find((n) => n.role === q.issuer);
+  el.innerHTML = `<div class="preview-quest"><b>${esc(q.name)}ที่${esc(nodeName(q.dest))}</b>
+    <table style="margin-top:8px"><tbody><tr><td>ผู้เสนอ</td><td>${issuer ? esc(issuer.name) + " (" + esc(q.issuer) + ")" : '<span class="muted">ยังไม่มี NPC อาชีพ ' + esc(q.issuer) + "</span>"}</td></tr>
+    <tr><td>ความเสี่ยงที่ทราบ</td><td><span class="chip ${q.threat}">${THREAT[q.threat]}</span></td></tr><tr><td>รางวัล</td><td>${esc(q.reward)}</td></tr><tr><td>สำเร็จเมื่อ</td><td>${esc(q.success)}</td></tr><tr><td>ผลต่อโลก</td><td>${esc(q.effect)}</td></tr></tbody></table>
+    <p class="note" style="margin-bottom:0">ตัวเลือกผู้เล่น: ดูรายละเอียด / ส่งลาง / ประทานพร / เฝ้าดูต่อ</p></div>
+    ${issuer ? "" : '<p class="note" style="color:' + COLORS.warn + '">ไม่มี NPC ที่ทำอาชีพนี้ ภารกิจนี้จะไม่เกิดในโลก</p>'}`;
+}
+
+// ---------- crisis ----------
+function secCrisis() {
+  const c = S.crisis;
+  return head("วิกฤตประจำบท", "วิกฤตมี 5 ขั้น ผู้เล่นต้องเห็นสัญญาณก่อนถึงจุดแตกหักเสมอ และต้องมีผลลัพธ์อย่างน้อย 3 แนวทาง (GDD เจาะลึก 10.3)") + `
+  <div class="stack"><div class="card"><div class="fields">
+    <label class="f">ชื่อวิกฤต<input type="text" id="crisis-name" data-cr="name" value="${esc(c.name)}"></label>
+    <label class="f">พื้นที่<select id="crisis-region" data-cr="region">${nodeOpts(c.region)}</select></label></div></div>
+  <div class="card"><h2>ลำดับขั้น</h2><div class="phases" id="crisis-phases">${c.phases.map((p, i) => `<div class="phase"><b>${i + 1}. ${esc(p.name)}</b>
+    <label class="f">เกิดเมื่อ<input type="text" id="ph-${i}-trigger" data-ph="${i}" data-pf="trigger" value="${esc(p.trigger)}"></label>
+    <label class="f">สิ่งที่ผู้เล่นเห็น<textarea id="ph-${i}-text" data-ph="${i}" data-pf="text">${esc(p.text)}</textarea></label></div>`).join("")}</div></div>
+  <div class="card"><h2>ผลลัพธ์ที่เป็นไปได้ (${c.outcomes.length})</h2><div class="tablewrap"><table><thead><tr><th>ชื่อผลลัพธ์</th><th>เงื่อนไข</th><th>ผลต่อโลก</th><th></th></tr></thead><tbody>
+    ${c.outcomes.map((o, i) => `<tr><td><input type="text" id="oc-${i}-name" data-oc="${i}" data-of="name" value="${esc(o.name)}"></td><td><input type="text" id="oc-${i}-cond" data-oc="${i}" data-of="cond" value="${esc(o.cond)}"></td><td><input type="text" id="oc-${i}-effect" data-oc="${i}" data-of="effect" value="${esc(o.effect)}"></td><td><button type="button" class="btn small danger" data-act="del-oc" data-i="${i}" aria-label="ลบผลลัพธ์">✕</button></td></tr>`).join("")}
+    </tbody></table></div><div class="row-actions"><button type="button" class="btn" data-act="add-oc">+ ผลลัพธ์</button></div></div></div>`;
+}
+
+// ---------- chronicle templates ----------
+function secTemplate() {
+  const t = byId(S.templates, ui.sel.template) || S.templates[0]; if (t) ui.sel.template = t.id;
+  const left = listHTML("template", S.templates.map((x) => ({ ...x, name: EVENT_NAMES[x.event] || x.event })), (x) => "") + `<div class="row-actions"><button type="button" class="btn" data-act="add-template">+ แม่แบบ</button></div>`;
+  if (!t) return head("แม่แบบพงศาวดาร", "") + `<div class="work"><div>${left}</div></div>`;
+  const fields = EVENT_FIELDS[t.event] || {};
+  return head("แม่แบบพงศาวดาร", "พงศาวดารเล่าจากข้อเท็จจริงในระบบเท่านั้น (ภาคผนวก Chronicle) แม่แบบใช้ได้เฉพาะช่องข้อมูลที่เหตุการณ์นั้นบันทึกไว้ ช่องที่ไม่มีจะถูกไฮไลต์") + `
+  <div class="work"><div>${left}</div>
+  <div class="card"><div class="fields">
+    ${field("ชนิดเหตุการณ์", sel("templates", t.id, "event", opts(Object.entries(EVENT_NAMES), t.event)), true)}
+    ${field("ข้อความแม่แบบ", area("templates", t.id, "text", t.text), true)}</div>
+    <p class="note">ช่องที่ใช้ได้ (คลิกเพื่อแทรก): ${Object.keys(fields).map((k) => `<button type="button" class="btn small tok" data-tok="${k}">{${k}}</button>`).join(" ")}</p>
+    <div class="row-actions">${delButton("template:" + t.id)}</div></div>
+  <div class="card preview"><h2>ตัวอย่างข้อความ</h2><div id="tpl-preview"></div></div></div>`;
+}
+function tplPreview() {
+  const t = byId(S.templates, ui.sel.template); const el = $("#tpl-preview"); if (!t || !el) return;
+  const facts = EVENT_FIELDS[t.event] || {};
+  const html = esc(t.text).replace(/\{(\w+)\}/g, (m, k) => (k in facts ? esc(facts[k]) : `<span class="ph">{${k}}</span>`));
+  el.innerHTML = `<p style="font-size:1rem;margin:0 0 10px;line-height:1.6">วันที่ 14 แห่งฤดูฝน — ${html}</p><h3>ข้อเท็จจริงตัวอย่าง</h3><pre class="mono" style="margin:0;white-space:pre-wrap">${esc(JSON.stringify(facts, null, 1))}</pre>`;
+}
+
+// ---------- powers ----------
+function secPower() {
+  const P = S.balance.powers, I = S.balance.influence;
+  return head("พลังกลุ่มดาว", "ต้นทุนและคูลดาวน์ของพลัง (D3) แก้แล้วดูทันทีว่าใน 10 วันเกมผู้เล่นใช้พลังแต่ละชนิดได้ประมาณกี่ครั้ง") + `
+  <div class="work two"><div class="card"><div class="tablewrap"><table><thead><tr><th>พลัง</th><th>ต้นทุน</th><th>คูลดาวน์ (ช่วงเวลา)</th><th>อยู่ใน MVP</th></tr></thead><tbody>
+    ${Object.entries(P).map(([k, p]) => `<tr><td>${esc(p.name)}</td><td><input type="number" id="pw-${k}-cost" data-bal="powers.${k}.cost" value="${p.cost}"></td><td><input type="number" id="pw-${k}-cd" data-bal="powers.${k}.cd" value="${p.cd}"></td><td><input type="checkbox" id="pw-${k}-mvp" data-bal="powers.${k}.mvp" data-bool="1"${p.mvp ? " checked" : ""} aria-label="อยู่ใน MVP"></td></tr>`).join("")}
+    </tbody></table></div>
+    <h3>แต้มอิทธิพล</h3><div class="fields">
+      <label class="f">เพดาน<input type="number" id="inf-cap" data-bal="influence.cap" value="${I.cap}"></label><label class="f">แต้มเริ่มต้น<input type="number" id="inf-start" data-bal="influence.start" value="${I.start}"></label>
+      <label class="f">ฟื้นต่อวันเกม<input type="number" id="inf-regen" data-bal="influence.regen_per_day" value="${I.regen_per_day}"></label><label class="f">ใส่ได้สูงสุดต่อเหตุการณ์<input type="number" id="inf-max" data-bal="influence.max_per_event" value="${I.max_per_event}"></label></div></div>
+  <div class="card preview"><h2>ใช้ได้กี่ครั้งใน 10 วันเกม</h2><div id="power-preview"></div></div></div>`;
+}
+function powerPreview() {
+  const el = $("#power-preview"); if (!el) return; const P = S.balance.powers, I = S.balance.influence;
+  const budget = Math.min(I.cap, I.start) + I.regen_per_day * 10;
+  const rows = Object.values(P).map((p) => { const byCost = Math.floor(budget / Math.max(p.cost, 1)), byCd = p.cd > 0 ? Math.floor(40 / p.cd) : Infinity; return { p, n: Math.min(byCost, byCd) }; });
+  const max = Math.max(...rows.map((r) => r.n), 1);
+  el.innerHTML = `<p class="note" style="margin:0 0 10px">แต้มที่มีใน 10 วัน ≈ เริ่ม ${Math.min(I.cap, I.start)} + ฟื้น ${I.regen_per_day * 10} = <b>${budget}</b> (ถ้าใช้พลังชนิดเดียวตลอด)</p>
+    <div class="bars">${rows.map((r) => `<div class="bar"><span>${esc(r.p.name)}${r.p.mvp ? "" : ' <small class="muted">(หลัง MVP)</small>'}</span><div class="track"><div class="fill" style="width:${(r.n / max) * 100}%"></div></div><b>${r.n}</b></div>`).join("")}</div>
+    <p class="note">GDD ตั้งเป้าให้ "ใช้พลังได้เป็นครั้งคราว ไม่ถี่จนควบคุมทุกเหตุการณ์" ถ้าพรใช้ได้เกิน 6–7 ครั้งใน 10 วัน อาจแรงเกินไป</p>`;
+}
+
+// ---------- balance ----------
+const BAL_LABELS = {
+  npc: ["NPC", { need_urgent_on: "ความต้องการเร่งด่วนเมื่อ ≥", need_urgent_off: "หายเร่งด่วนเมื่อ ≤", memory_max_per_npc: "ความทรงจำสูงสุดต่อคน" }],
+  party_combat: ["ปาร์ตี้และการต่อสู้", { power_weight_combat_skill: "น้ำหนักทักษะต่อสู้", power_weight_equipment: "น้ำหนักอุปกรณ์", power_weight_health_ratio: "น้ำหนักสุขภาพ", power_weight_role_synergy: "น้ำหนักความเข้ากันของบทบาท", risk_ratio_low_below: "เสี่ยงต่ำ เมื่อ risk_ratio <", risk_ratio_medium_below: "ปานกลาง เมื่อ <", risk_ratio_high_below: "สูง เมื่อ < (เกินนี้ = วิกฤต)" }],
+  economy: ["เศรษฐกิจ", { target_stock_days: "สต็อกเป้าหมาย (วัน)", price_exponent: "เลขชี้กำลังราคา", price_index_min: "ราคาต่ำสุด (เท่าของฐาน)", price_index_max: "ราคาสูงสุด (เท่าของฐาน)", price_daily_change_max: "เปลี่ยนต่อวันสูงสุด", shop_buy_ratio: "ร้านรับซื้อ (เท่า)", shop_sell_ratio: "ร้านขาย (เท่า)" }],
+  chronicle: ["พงศาวดาร", { importance_timeline: "เก็บใน timeline เมื่อคะแนน ≥", importance_notable: "Notable Event เมื่อ ≥", importance_chronicle: "เข้าพงศาวดารหลักเมื่อ ≥", importance_era: "หมุดหมายยุคเมื่อ ≥" }],
+};
+function secBalance() {
+  return head("ตัวเลข Balance", "ค่าเดียวกับ data/balance.json (BALANCE.md) จุดสีทองคือค่าที่ต่างจากค่าเริ่มต้น ทุกหน้าใน Studio และระบบจำลองอ่านค่าจากที่นี่") + `
+  <div class="stack">${Object.entries(BAL_LABELS).map(([g, [title, fields]]) => `<div class="card"><h2>${title}</h2><div class="tablewrap"><table><tbody>
+    ${Object.entries(fields).map(([k, l]) => { const v = S.balance[g][k], d = DEFAULT.balance[g][k]; return `<tr><td>${l} <span class="mono muted">${g}.${k}</span></td><td><input type="number" step="any" id="bal-${g}-${k}" data-bal="${g}.${k}" value="${v}"></td><td>${v !== d ? `<span class="changed" title="ค่าเริ่มต้น ${d}">●</span> <button type="button" class="btn small" data-reset-bal="${g}.${k}">คืนค่า ${d}</button>` : '<span class="muted note">ค่าเริ่มต้น</span>'}</td></tr>`; }).join("")}
+    </tbody></table></div></div>`).join("")}</div>`;
+}
+
+// ---------- simulation ----------
+function mulberry32(a) { return () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+function simulate(opt) {
+  const rng = mulberry32(opt.seed), ri = (a, b) => a + Math.floor(rng() * (b - a + 1));
+  const T = (id, facts) => { const t = S.templates.find((x) => x.event === id); return t ? fillTemplate(t.text, facts) : ""; };
+  const med = byId(S.goods, "medicine"); if (!med) return { error: "ต้องมีสินค้า id 'medicine' ก่อนรันการจำลอง" };
+  const village = byId(S.nodes, S.crisis.region) || S.nodes[0], forest = byId(S.nodes, "forest") || S.nodes.find((n) => n.type === "wild");
+  if (!village || !forest) return { error: "ต้องมีหมู่บ้านและพื้นที่ป่าในแผนที่" };
+  const route = S.routes.filter((r) => [r.a, r.b].includes(village.id) && [r.a, r.b].includes(forest.id)).sort((a, b) => a.days - b.days)[0];
+  const travel = Math.max(1, Math.ceil(route ? route.days : 2));
+  const healer = S.npcs.find((n) => n.role === "ผู้รักษา"); const advs = S.npcs.filter((n) => ADVENTURER_ROLES.includes(n.role));
+  const target = med.daily * S.balance.economy.target_stock_days; const E = S.balance.economy, I = S.balance.influence, omenCost = (S.balance.powers.omen || {}).cost ?? 12;
+  let M = Math.round(target * 0.45), price = med.base * priceIndex(M, target), inf = Math.min(I.cap, I.start);
+  const injured = {}, dead = new Set(); const log = [], series = { stock: [], price: [], inf: [] };
+  const stats = { quests: 0, success: 0, retreat: 0, fail: 0, injuries: 0, deaths: 0, shortageDays: 0, omens: 0 };
+  const level = (m) => (m / target >= 0.6 ? "ปกติ" : m / target >= 0.3 ? "ตึงตัว" : "วิกฤต");
+  let lvl = level(M), quest = null, refusedLogged = false;
+  const monsters = S.monsters.filter((m) => m.habitat === forest.id);
+  for (let day = 1; day <= opt.days; day++) {
+    inf = Math.min(I.cap, inf + I.regen_per_day);
+    for (const k in injured) if (--injured[k] <= 0) delete injured[k];
+    M = Math.max(0, M - (med.daily + Object.keys(injured).length));
+    const raw = med.base * priceIndex(M, target); price = clamp(raw, price * (1 - E.price_daily_change_max), price * (1 + E.price_daily_change_max));
+    const nl = level(M); if (nl !== lvl) { log.push([day, T("shortage_changed", { good: "ยา", place: village.name, from: lvl, to: nl })]); lvl = nl; }
+    if (M / target < 0.3) stats.shortageDays++;
+    if (!quest && M / target < 0.5 && healer && !dead.has(healer.id)) { quest = { state: "open", amount: 10 }; stats.quests++; refusedLogged = false; log.push([day, T("quest_posted", { issuer: healer.name, item: "ใบจันทร์ขาว", amount: 10, place: forest.name })]); }
+    if (quest && quest.state === "open") {
+      const free = advs.filter((n) => !injured[n.id] && !dead.has(n.id));
+      if (free.length) {
+        const leader = free[0]; const sc = { food: 1.5, info: 40, fatigue: 25, threat: forest.risk === "low" ? 25 : forest.risk === "mid" ? 55 : 75 };
+        const d = decide(leader, sc);
+        if (d.best.name === "ปฏิเสธภารกิจ") { if (!refusedLogged) { log.push([day, `${leader.name}ปฏิเสธภารกิจ: ${d.reason.replace(leader.name + "เลือก ", "")}`]); refusedLogged = true; } }
+        else if (d.best.name !== "พักหนึ่งช่วง") {
+          quest.party = free.slice(0, 2); quest.state = "travel"; quest.prep = d.best.name === "เตรียมของก่อน" ? 1 : 0; quest.omen = false;
+          if (opt.omen && inf >= omenCost) { inf -= omenCost; quest.omen = true; stats.omens++; log.push([day, T("omen_sent", { party_leader: leader.name, clue: "มีรอยฝูงมอนสเตอร์บนเส้นทางตรง" })]); }
+          quest.arrive = day + quest.prep + travel + (quest.omen ? 1 : 0);
+        }
+      }
+    }
+    if (quest && quest.state === "travel" && day >= quest.arrive) {
+      const party = quest.party, names = party.map((p) => p.name); let herbs, outcome = "success", hurt = null, sev = "เล็กน้อย";
+      const meet = monsters.length && rng() < (quest.omen ? 0.3 : 0.6);
+      if (meet) {
+        const mon = monsters[ri(0, monsters.length - 1)], r = monsterPower(mon) / Math.max(partyPower(party, injured), 1);
+        const brave = party.reduce((s, p) => s + p.traits.bravery - p.traits.caution, 0) / party.length; const retreatAt = 1 + brave / 200;
+        if (r > retreatAt) { outcome = "retreat"; herbs = ri(0, 4); if (rng() < 0.3) hurt = party[ri(0, party.length - 1)]; }
+        else if (rng() < clamp(0.9 - (r - 0.5) * 0.45, 0.15, 0.95)) { herbs = ri(9, 14); if (rng() < 0.25) hurt = party[ri(0, party.length - 1)]; }
+        else { outcome = "fail"; herbs = ri(0, 3); hurt = party[ri(0, party.length - 1)]; sev = "หนัก"; }
+        quest.met = mon.name;
+      } else herbs = ri(10, 14);
+      quest.state = "return"; quest.back = day + travel; quest.herbs = herbs; quest.outcome = outcome; quest.hurt = hurt; quest.sev = sev; quest.names = names;
+      if (hurt) { stats.injuries++; injured[hurt.id] = sev === "หนัก" ? 6 : 3; log.push([day, T("npc_injured", { npc: hurt.name, severity: sev, activity: meet ? `ปะทะ${quest.met}ที่${forest.name}` : `เก็บสมุนไพรที่${forest.name}` })]);
+        if (sev === "หนัก" && opt.death === "death" && rng() < 0.25) { dead.add(hurt.id); stats.deaths++; log.push([day, `${hurt.name}เสียชีวิตจากบาดแผล พงศาวดารบันทึกการจากไปและเพื่อนร่วมทางจดจำเหตุการณ์นี้`]); } }
+    }
+    if (quest && quest.state === "return" && day >= quest.back) {
+      M += quest.herbs; stats[quest.outcome]++;
+      log.push([day, T("party_returned", { party_leader: quest.names[0], place: forest.name, item: "ใบจันทร์ขาว", amount: quest.herbs, injured_note: quest.hurt ? ` แม้${quest.hurt.name}บาดเจ็บ${quest.sev}` : "" }) + (quest.outcome === "retreat" ? " (ถอยกลับเพราะเจอ" + quest.met + ")" : "")]);
+      quest = null;
+    }
+    series.stock.push(M); series.price.push(price); series.inf.push(inf);
+  }
+  return { log, series, stats, target };
+}
+function secSim() {
+  const o = ui.sim;
+  return head("ทดสอบจำลอง", "รันโลกแบบย่อด้วยข้อมูลทั้งหมดใน Studio (NPC บุคลิก มอนสเตอร์ ราคา แม่แบบพงศาวดาร ตัวเลข) seed เดิมให้ผลเดิมทุกครั้ง ตามหลัก Simulation Lab (Playtest Roadmap P0)") + `
+  <div class="stack"><div class="card"><div class="fields" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
+    <label class="f">Seed<input type="number" id="sim-seed" data-sim="seed" value="${o.seed}"></label>
+    <label class="f">จำนวนวันเกม<input type="number" id="sim-days" data-sim="days" min="5" max="120" value="${o.days}"></label>
+    <label class="f">ความตาย (D5)<select id="sim-death" data-sim="death">${opts([["warn", "บาดเจ็บวิกฤตแทนตาย"], ["death", "ตายได้ มีสัญญาณเตือน"]], o.death)}</select></label>
+    <label class="f">กลุ่มดาวส่งลางอัตโนมัติ<select id="sim-omen" data-sim="omen">${opts([["true", "ส่งลางเมื่อแต้มพอ"], ["false", "ไม่แทรกแซงเลย"]], String(o.omen))}</select></label></div>
+    <div class="row-actions"><button type="button" class="btn primary" data-act="run-sim">รันการจำลอง</button><button type="button" class="btn" data-act="new-seed">สุ่ม seed ใหม่</button></div></div>
+  <div id="sim-out"></div></div>`;
+}
+function simOut() {
+  const el = $("#sim-out"); if (!el) return; const r = ui.simResult; if (!r) { el.innerHTML = ""; return; }
+  if (r.error) { el.innerHTML = `<div class="card"><p style="color:${COLORS.bad};margin:0">${esc(r.error)}</p></div>`; return; }
+  const s = r.stats;
+  el.innerHTML = `<div class="card"><div class="kpis">
+      <div class="kpi"><span>ภารกิจที่เกิด</span><b>${s.quests}</b></div><div class="kpi"><span>สำเร็จ / ถอย / ล้มเหลว</span><b>${s.success} / ${s.retreat} / ${s.fail}</b></div>
+      <div class="kpi"><span>วันที่ยาวิกฤต</span><b style="color:${s.shortageDays > ui.sim.days * 0.3 ? COLORS.bad : COLORS.text}">${s.shortageDays}</b></div><div class="kpi"><span>บาดเจ็บ / เสียชีวิต</span><b>${s.injuries} / ${s.deaths}</b></div>
+      <div class="kpi"><span>กลุ่มดาวส่งลาง</span><b>${s.omens}</b></div></div></div>
+    <div class="work two" style="margin-top:0"><div class="card"><h2>สต็อกยาในหมู่บ้าน</h2><canvas class="chart" id="sim-stock"></canvas><h2 style="margin-top:12px">ราคายา</h2><canvas class="chart" id="sim-price"></canvas></div>
+    <div class="card"><h2>พงศาวดารที่เกิดขึ้น (${r.log.length})</h2><div class="log">${r.log.map(([d, t]) => `<div><span>วัน ${d}</span><p style="margin:0">${esc(t)}</p></div>`).join("") || '<p class="muted">ไม่มีเหตุการณ์สำคัญ</p>'}</div></div></div>`;
+  const xs = r.series.stock.map((_, i) => i + 1);
+  chart($("#sim-stock"), { xs, ys: r.series.stock, ymin: 0, ymax: Math.max(r.target * 1.2, ...r.series.stock) * 1.05, color: COLORS.ok, fill: true, hline: { y: r.target * 0.3, label: "วิกฤต" }, hline2: { y: r.target, label: "เป้าหมาย" }, ylab: (v) => v.toFixed(0), xlab: (v) => "วัน " + v });
+  chart($("#sim-price"), { xs, ys: r.series.price, ymin: 0, ymax: Math.max(...r.series.price) * 1.2, color: COLORS.gold, ylab: (v) => v.toFixed(0), xlab: (v) => "วัน " + v });
+}
+
+// ======================= chart =======================
+function chart(cv, o) {
+  if (!cv) return; const d = Math.min(window.devicePixelRatio || 1, 2), w = cv.clientWidth, h = cv.clientHeight; cv.width = w * d; cv.height = h * d;
+  const c = cv.getContext("2d"); c.setTransform(d, 0, 0, d, 0, 0); c.clearRect(0, 0, w, h);
+  const L = 40, R = 10, Tp = 10, B = 22, xmin = o.xs[0], xmax = o.xs[o.xs.length - 1];
+  const X = (v) => L + ((v - xmin) / (xmax - xmin || 1)) * (w - L - R), Y = (v) => Tp + (1 - (v - o.ymin) / (o.ymax - o.ymin || 1)) * (h - Tp - B);
+  c.font = "11px Sarabun, sans-serif"; c.fillStyle = COLORS.muted; c.strokeStyle = COLORS.line; c.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) { const v = o.ymin + ((o.ymax - o.ymin) * i) / 4, y = Y(v); c.globalAlpha = 0.5; c.beginPath(); c.moveTo(L, y); c.lineTo(w - R, y); c.stroke(); c.globalAlpha = 1; c.textAlign = "right"; c.textBaseline = "middle"; c.fillText(o.ylab(v), L - 6, y); }
+  c.textAlign = "center"; c.textBaseline = "top"; c.fillText(o.xlab(xmin), X(xmin) + 14, h - B + 6); c.fillText(o.xlab(xmax), X(xmax) - 16, h - B + 6);
+  for (const hl of [o.hline, o.hline2]) if (hl) { c.setLineDash([4, 4]); c.strokeStyle = hl === o.hline ? COLORS.bad : COLORS.muted; c.beginPath(); c.moveTo(L, Y(hl.y)); c.lineTo(w - R, Y(hl.y)); c.stroke(); c.setLineDash([]); c.fillStyle = c.strokeStyle; c.textAlign = "right"; c.textBaseline = "bottom"; c.fillText(hl.label, w - R, Y(hl.y) - 2); }
+  if (o.vline) { c.setLineDash([4, 4]); c.strokeStyle = COLORS.muted; c.beginPath(); c.moveTo(X(o.vline.x), Tp); c.lineTo(X(o.vline.x), h - B); c.stroke(); c.setLineDash([]); c.fillStyle = COLORS.muted; c.textAlign = "left"; c.textBaseline = "top"; c.fillText(o.vline.label, X(o.vline.x) + 4, Tp); }
+  c.beginPath(); o.xs.forEach((x, i) => (i ? c.lineTo(X(x), Y(o.ys[i])) : c.moveTo(X(x), Y(o.ys[i]))));
+  c.strokeStyle = o.color; c.lineWidth = 2; c.stroke();
+  if (o.fill) { c.lineTo(X(xmax), Y(o.ymin)); c.lineTo(X(xmin), Y(o.ymin)); c.closePath(); c.globalAlpha = 0.15; c.fillStyle = o.color; c.fill(); c.globalAlpha = 1; }
+  const last = o.mark || { x: xmax, y: o.ys[o.ys.length - 1] };
+  c.fillStyle = o.color; c.beginPath(); c.arc(X(clamp(last.x, xmin, xmax)), Y(last.y), 4.5, 0, Math.PI * 2); c.fill();
+}
+
+// ======================= render + events =======================
+const SEC_FN = { overview: secOverview, world: secWorld, npc: secNPC, monster: secMonster, good: secGood, quest: secQuest, crisis: secCrisis, template: secTemplate, power: secPower, balance: secBalance, sim: secSim };
+function derived() { npcPreview(); monPreview(); goodPreview(); questPreview(); tplPreview(); powerPreview(); simOut(); drawMap(); renderNav(); }
+function render() { $("#main").innerHTML = SEC_FN[ui.sec](); derived(); if (ui.sec === "sim" && !ui.simResult) { ui.simResult = simulate(ui.sim); simOut(); } }
+function changed(full) { save(); if (ui.sec === "sim") ui.simResult = simulate(ui.sim); else ui.simResult = null; if (full) render(); else derived(); }
+
+const main = $("#main");
+main.addEventListener("input", (e) => {
+  const t = e.target, out = t.id && document.querySelector(`[data-out="${t.id}"]`); if (out) out.textContent = t.value;
+  if (t.dataset.col) {
+    const col = t.dataset.col, item = byId(S[col], t.dataset.id); if (!item) return;
+    let v = t.dataset.num ? Number(t.value) : t.value; if (t.dataset.num && Number.isNaN(v)) return;
+    setPath(item, t.dataset.field, v);
+    if (t.dataset.field === "name") { const lab = document.querySelector(`[data-label="${CSS.escape(item.id)}"]`); if (lab) lab.textContent = v || "(ไม่มีชื่อ)"; }
+    changed(t.tagName === "SELECT" && ["role", "event", "kind", "threat", "a", "b"].includes(t.dataset.field)); return;
+  }
+  if (t.dataset.sc) { ui.sc[t.dataset.sc] = Number(t.value); npcPreview(); return; }
+  if (t.dataset.stock) { ui.stock = Number(t.value); goodPreview(); return; }
+  if (t.dataset.rel != null) { const n = byId(S.npcs, ui.sel.npc); const r = n.rel[+t.dataset.rel]; r[t.dataset.rf] = ["trust", "affinity", "respect", "grievance"].includes(t.dataset.rf) ? clamp(Number(t.value) || 0, 0, 100) : t.value; changed(); return; }
+  if (t.dataset.cr) { S.crisis[t.dataset.cr] = t.value; changed(); return; }
+  if (t.dataset.ph != null) { S.crisis.phases[+t.dataset.ph][t.dataset.pf] = t.value; changed(); return; }
+  if (t.dataset.oc != null) { S.crisis.outcomes[+t.dataset.oc][t.dataset.of] = t.value; changed(); return; }
+  if (t.dataset.bal) { const v = t.dataset.bool ? t.checked : Number(t.value); if (!t.dataset.bool && Number.isNaN(v)) return; setPath(S.balance, t.dataset.bal, v); save(); ui.simResult = null; powerPreview(); renderNav(); if (ui.sec === "balance") { clearTimeout(main._bt); main._bt = setTimeout(() => { const a = document.activeElement && document.activeElement.id; render(); if (a) { const el = document.getElementById(a); if (el) { el.focus(); try { el.setSelectionRange(el.value.length, el.value.length); } catch (er) {} } } }, 700); } return; }
+  if (t.dataset.party) { ui.party = [...document.querySelectorAll("[data-party]:checked")].map((x) => x.dataset.party); monPreview(); return; }
+  if (t.dataset.sim) { const k = t.dataset.sim; ui.sim[k] = k === "omen" ? t.value === "true" : k === "death" ? t.value : Number(t.value); if (k === "days") ui.sim.days = clamp(ui.sim.days || 30, 5, 120); return; }
+});
+main.addEventListener("change", (e) => { if (e.target.dataset.party) { ui.party = [...document.querySelectorAll("[data-party]:checked")].map((x) => x.dataset.party); monPreview(); } if (e.target.dataset.bool) main.dispatchEvent(new Event("input")); });
+main.addEventListener("click", (e) => {
+  const pick = e.target.closest("[data-pick]"); if (pick) { ui.sel[ui.sec] = pick.dataset.pick; ui.confirm = null; render(); return; }
+  const gt = e.target.closest("[data-goto]"); if (gt) { const sec = gt.dataset.goto, id = gt.dataset.gotoId; go(sec, id ? (sec === "world" ? { kind: gt.dataset.gotoKind || "node", id } : id) : null); return; }
+  const tok = e.target.closest("[data-tok]"); if (tok) { const ta = document.querySelector("textarea[data-field='text']"); const t = byId(S.templates, ui.sel.template); if (ta && t) { const p = ta.selectionStart ?? ta.value.length; ta.value = ta.value.slice(0, p) + "{" + tok.dataset.tok + "}" + ta.value.slice(p); t.text = ta.value; changed(); ta.focus(); } return; }
+  const rb = e.target.closest("[data-reset-bal]"); if (rb) { setPath(S.balance, rb.dataset.resetBal, getPath(DEFAULT.balance, rb.dataset.resetBal)); changed(true); return; }
+  const b = e.target.closest("[data-act]"); if (!b) return; const act = b.dataset.act;
+  const n = byId(S.npcs, ui.sel.npc);
+  if (act === "add-npc") { const id = newId("npc", S.npcs); S.npcs.push({ id, name: "NPC ใหม่", role: "ชาวนา", home: S.nodes[0]?.id || "", color: "#8fa0c8", traits: { bravery: 50, caution: 50, generosity: 50, ambition: 50, sociability: 50 }, skills: { combat: 20, gathering: 30, healing: 10, crafting: 20, negotiation: 20 }, goalShort: "", goalLong: "", rel: [] }); ui.sel.npc = id; changed(true); }
+  else if (act === "add-rel" && n) { const other = S.npcs.find((x) => x.id !== n.id && !n.rel.some((r) => r.to === x.id)) || S.npcs.find((x) => x.id !== n.id); n.rel.push({ to: other.id, trust: 50, affinity: 50, respect: 50, grievance: 0, why: "" }); changed(true); }
+  else if (act === "del-rel" && n) { n.rel.splice(+b.dataset.i, 1); changed(true); }
+  else if (act === "add-monster") { const id = newId("monster", S.monsters); S.monsters.push({ id, name: "มอนสเตอร์ใหม่", kind: "common", habitat: S.nodes.find((x) => x.type === "wild")?.id || S.nodes[0]?.id, threat: 10, gmin: 1, gmax: 3, behavior: "", drops: "" }); ui.sel.monster = id; changed(true); }
+  else if (act === "add-good") { const id = newId("good", S.goods); S.goods.push({ id, name: "สินค้าใหม่", cat: "", base: 5, shelf: 30, daily: 1, sub: "" }); ui.sel.good = id; changed(true); }
+  else if (act === "add-quest") { const id = newId("quest", S.quests); S.quests.push({ id, name: "ภารกิจใหม่", trigger: "", issuer: ROLES[0], dest: S.nodes[0]?.id, threat: "mid", reward: "", success: "", fail: "", effect: "" }); ui.sel.quest = id; changed(true); }
+  else if (act === "add-template") { const id = newId("tpl", S.templates); S.templates.push({ id, event: "npc_injured", text: "{npc}…" }); ui.sel.template = id; changed(true); }
+  else if (act === "add-oc") { S.crisis.outcomes.push({ name: "ผลลัพธ์ใหม่", cond: "", effect: "" }); changed(true); }
+  else if (act === "del-oc") { S.crisis.outcomes.splice(+b.dataset.i, 1); changed(true); }
+  else if (act === "add-node") { const id = newId("place", S.nodes); S.nodes.push({ id, name: "สถานที่ใหม่", type: "wild", risk: "mid", x: 500, y: 300, res: "" }); ui.sel.world = { kind: "node", id }; changed(true); }
+  else if (act === "link") { ui.link = !ui.link; ui.linkFrom = null; render(); }
+  else if (act === "ask-del") { ui.confirm = b.dataset.key; render(); }
+  else if (act === "cancel-del") { ui.confirm = null; render(); }
+  else if (act === "confirm-del") {
+    const [kind, id] = ui.confirm.split(":"); const map = { node: "nodes", route: "routes", npc: "npcs", monster: "monsters", good: "goods", quest: "quests", template: "templates" };
+    S[map[kind]] = S[map[kind]].filter((x) => x.id !== id); ui.confirm = null;
+    if (kind === "node" || kind === "route") ui.sel.world = { kind: "node", id: S.nodes[0]?.id }; else ui.sel[kind] = (S[map[kind]][0] || {}).id;
+    toast("ลบแล้ว"); changed(true);
+  }
+  else if (act === "run-sim") { ui.simResult = simulate(ui.sim); simOut(); toast("รันเสร็จ seed " + ui.sim.seed); }
+  else if (act === "new-seed") { ui.sim.seed = Math.floor(Math.random() * 99999); ui.simResult = simulate(ui.sim); render(); }
+});
+
+// top bar
+$("#json-btn").addEventListener("click", () => {
+  const d = $("#drawer"); if (!d.hidden) { d.hidden = true; return; }
+  const pick = { world: { nodes: S.nodes, routes: S.routes.map(({ _lx, _ly, ...r }) => r) }, npc: { npcs: S.npcs }, monster: { monsters: S.monsters }, good: { goods: S.goods }, quest: { quests: S.quests }, crisis: { crisis: S.crisis }, template: { templates: S.templates }, power: { powers: S.balance.powers, influence: S.balance.influence }, balance: { balance: S.balance } }[ui.sec];
+  const file = { world: "world.json", npc: "npcs.json", monster: "monsters.json", good: "goods.json", quest: "quests.json", crisis: "crisis.json", template: "chronicle_templates.json", power: "balance.json (powers)", balance: "balance.json" }[ui.sec];
+  $("#drawer-title").textContent = pick ? "data/" + file : "ทั้งโครงการ";
+  $("#json-out").textContent = JSON.stringify(pick || { ...S, routes: S.routes.map(({ _lx, _ly, ...r }) => r) }, null, 2); d.hidden = false;
+});
+$("#close-json").addEventListener("click", () => { $("#drawer").hidden = true; });
+$("#copy-json").addEventListener("click", () => {
+  const txt = $("#json-out").textContent;
+  navigator.clipboard.writeText(txt).then(() => toast("คัดลอกแล้ว"), () => { const r = document.createRange(); r.selectNodeContents($("#json-out")); const s = getSelection(); s.removeAllRanges(); s.addRange(r); toast("เลือกข้อความไว้แล้ว กด Ctrl+C"); });
+});
+const resetBtn = $("#reset-btn");
+resetBtn.addEventListener("click", () => {
+  if (resetBtn.dataset.armed) { S = clone(DEFAULT); try { localStorage.removeItem(KEY); } catch (e) {} delete resetBtn.dataset.armed; resetBtn.textContent = "คืนค่าตัวอย่าง"; ui.simResult = null; toast("คืนค่าตัวอย่างแล้ว"); render(); return; }
+  resetBtn.dataset.armed = "1"; resetBtn.textContent = "กดอีกครั้งเพื่อยืนยัน"; setTimeout(() => { delete resetBtn.dataset.armed; resetBtn.textContent = "คืนค่าตัวอย่าง"; }, 3000);
+});
+window.addEventListener("resize", () => { drawMap(); goodPreview(); simOut(); });
+
+const start = (location.hash || "").slice(1); if (SEC_FN[start]) ui.sec = start;
+render();
+})();
+</script>
+</body>
+</html>
