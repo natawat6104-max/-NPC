@@ -1,6 +1,9 @@
 # นำร่างพื้นฐานเข้า Godot 4
 
-ร่างที่ใช้: [`assets/models/Meshy_AI_Character_output_10.glb`](../assets/models/Meshy_AI_Character_output_10.glb) (Meshy SmartRig, กระดูก 69 ชิ้น มีนิ้วครบ, สูง 1.7 เมตร, หันหน้า +Z) — ดู D15 ใน [`DECISIONS.md`](DECISIONS.md)
+ร่างที่ใช้ในเกม: **[`assets/models/char10-npc.glb`](../assets/models/char10-npc.glb)** (0.7 MB, 12,000 สามเหลี่ยม, วัสดุ `Skin` `Shirt` `Pants` `Footwear`, texture ผิว 1024px ชิ้นเดียว) — ทำจากต้นฉบับ [`Meshy_AI_Character_output_10.glb`](../assets/models/Meshy_AI_Character_output_10.glb) (Meshy SmartRig, กระดูก 69 ชิ้น มีนิ้วครบ, สูง 1.7 เมตร, หันหน้า +Z) ด้วย `tools/models/make_npc_body.py` — ดู D15/D16 ใน [`DECISIONS.md`](DECISIONS.md)
+
+- เปลี่ยนสีชุด: ตั้ง `albedo_color` ของวัสดุ `Shirt` (สีหลัก) `Pants` (สีรอง) ต่อ NPC (ใช้ `material_override` หรือ `set_surface_override_material` กับสำเนาของวัสดุ) — `Skin` มี texture ที่ปรับให้สว่าง สีผิวมาจาก `albedo_color` เช่นกัน
+- ข้อ 1 และ 3 ด้านล่างใช้กับต้นฉบับเท่านั้น `char10-npc.glb` ย่อ texture และลดสามเหลี่ยมแล้ว
 
 ## 1. ขนาด texture (พื้นผิว)
 ต้นฉบับมี texture 3 ภาพ: สีพื้น 4096px, normal 4096px, metallic/roughness 2048px (รวม ~12.9 MB) — มากเกินสำหรับ NPC ที่มองจากฟ้า
@@ -17,7 +20,7 @@
 
 ## 2. จับคู่กระดูก (ให้ใช้ท่าทาง Humanoid ร่วมกันได้)
 ชื่อกระดูกเป็น `Bone_000…` Godot เดาเองไม่ได้ ให้ใส่เอง หรือใช้ไฟล์ที่ทำไว้แล้ว [`assets/models/Meshy_AI_Character_output_10.bonemap.tres`](../assets/models/Meshy_AI_Character_output_10.bonemap.tres) (ข้อ 2 เลือก `Bone Map` → Load แทน New BoneMap):
-1. ดับเบิลคลิกไฟล์ .glb → หน้าต่าง Advanced Import Settings → คลิก `Skeleton3D` ทางซ้าย
+1. ดับเบิลคลิกไฟล์ .glb → หน้าต่าง Advanced Import Settings → คลิก `Skeleton3D` ทางซ้าย (ใน `char10-npc.glb` อยู่ที่ `SmartRigArmature/Skeleton3D`)
 2. `Retarget > Bone Map` → New BoneMap → `Profile` = `SkeletonProfileHumanoid`
 3. ใส่ตามตารางนี้ (ครบทุกตำแหน่งรวมนิ้วอยู่ใน [`assets/models/Meshy_AI_Character_output_10.bonemap.json`](../assets/models/Meshy_AI_Character_output_10.bonemap.json))
 
@@ -78,7 +81,7 @@ BoneMap ที่ทำไว้แล้ว (ใน [`assets/animations/godot/`
 
 ### ใช้กับ NPC
 ```gdscript
-var body := preload("res://characters/body.glb").instantiate()   # ร่างที่ตั้ง BoneMap แล้ว (ข้อ 2)
+var body := preload("res://assets/models/char10-npc.glb").instantiate()   # ร่างที่ตั้ง BoneMap แล้ว (ข้อ 2)
 add_child(body)
 var ap := AnimationPlayer.new()
 body.add_child(ap)                                              # root_node = ".." คือตัว body
@@ -90,7 +93,7 @@ ap.play("walk/female_walking")                                  # "<ชื่อ
 - **อย่าตั้งชื่อท่าลงท้ายด้วย `_loop` / `_cycle`** Godot จะตัดคำนั้นออกจากชื่อเอง
 
 ### ผลทดสอบ (Godot 4.7.2, ทำแบบ headless)
-- นำเข้าร่างพื้นฐาน (`char10-base.glb`) + ท่าทั้ง 425 ไฟล์ด้วยวิธีทางลัด: ไม่มี error
+- นำเข้าร่างพื้นฐาน (`char10-base.glb` และ `char10-npc.glb`) + ท่าทั้ง 425 ไฟล์ด้วยวิธีทางลัด: ไม่มี error
 - เล่นทุกท่าบนร่างพื้นฐาน: track ผูกกับกระดูกครบทุกท่า, เท้าอยู่ระดับพื้น (ยกเว้นท่าตก/กระโดดที่ลอยจริง), ท่าวน 167/167 ตั้งค่าถูก
 - ตัวอย่าง: ยืน (มือห้อยลงจาก T-pose ถูกต้อง) · คุกเข่า (สะโพกลดจาก 0.99 เหลือ 0.50 ม.) · เดิน (เท้าสลับยก)
 

@@ -1211,7 +1211,8 @@ async function importBodyBuffer(buf, fileName, size, extra = {}) {
 
 // The sample base body ships next to the page, so the studio shows the team's model without importing it first.
 // .glb in the repo; base64 text where the host only serves text types.
-const SAMPLE_BODY = { v: 3, src: "models/char10-base.glb", alt: "models/char10-base.glb.b64.txt", file: "char10-base.glb", name: "ร่างพื้นฐาน (Meshy Character 10)" };
+// v4: the in-game NPC body (D16) — 12k triangles, Skin / Shirt / Pants / Footwear materials so outfits follow the role colours.
+const SAMPLE_BODY = { v: 4, src: "models/char10-npc.glb", alt: "models/char10-npc.glb.b64.txt", file: "char10-npc.glb", name: "ร่าง NPC (Meshy Character 10 · 12k)" };
 async function fetchModel(src, alt) {
   try { const r = await fetch(src); if (r.ok) return await r.arrayBuffer(); } catch (e) {}
   if (!alt) return null;
