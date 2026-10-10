@@ -94,7 +94,7 @@
 - **กระดูก:** จับคู่กับชื่อมาตรฐาน `SkeletonProfileHumanoid` ของ Godot (Hips, Spine, Chest, Neck, Head, Left/RightUpperArm …) เพื่อใช้ชุดท่าทางเดียวกันกับทุกร่าง และนำ bone map ไปใช้ตอน import ใน Godot ได้ตรง ๆ
 - **สี:** วัสดุ (material) ในไฟล์ถูกกำหนดว่าเป็น ผิว / ผม / ชุดสีหลัก / ชุดสีรอง / คงเดิม แล้วระบบเปลี่ยนสีตามรูปลักษณ์ของ NPC — ตั้งชื่อวัสดุใน Blender ให้สื่อ (Skin, Hair, Dress, Shoes) ระบบจะเดาให้เอง
 - **ชิ้นส่วนเสริม:** หมวกและผมติดกับกระดูกหัว ของถือติดกับกระดูกมือ เป้/ผ้าคลุมติดกับกระดูกอก — ชุดที่เปลี่ยนรูปทรง (ชุดยาว เกราะเต็มตัว) ต้องทำเป็นชิ้นใน Blender ภายหลัง
-- **ร่างที่ใช้:** `Meshy_AI_Character_output_10.glb` ใน [`assets/models/`](../assets/models/) (แทนร่างแรก `fantasy_teen_bald` ที่นิ้วเป็นแบบถุงมือ)
+- **ร่างที่ใช้:** `Meshy_AI_Character_output_10.glb` ใน [`assets/models/source/`](../assets/models/source/) (แทนร่างแรก `fantasy_teen_bald` ที่นิ้วเป็นแบบถุงมือ)
   - Meshy SmartRig กระดูก 69 ชิ้น ชื่อเป็นเลข (`Bone_000…`) — Studio จับคู่จากรูปร่างโครงกระดูกได้ครบ 52 ตำแหน่งรวมนิ้วทุกนิ้ว ตาราง bone map อยู่ใน [`GODOT-IMPORT.md`](GODOT-IMPORT.md)
   - ขนาด texture ในเกม: สีพื้น 1024 · normal 1024 · metallic/roughness 512 (ต้นฉบับ 4096/4096/2048) — ฉบับย่อ `mockups/models/char10-base.glb`
   - **ร่างที่ใช้ในเกม:** [`assets/models/char10-npc.glb`](../assets/models/char10-npc.glb) — ลดเหลือ 12,000 สามเหลี่ยม แบ่งวัสดุ ผิว/เสื้อ/กางเกง/รองเท้า (D16) สร้างด้วย `tools/models/make_npc_body.py`

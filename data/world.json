@@ -1,0 +1,567 @@
+{
+ "_about": "เนื้อหาเริ่มต้นของโลก (ส่งออกจาก Star Studio: ปุ่ม \"ดู JSON\") — ตัวเลข balance อยู่ที่ data/balance.json",
+ "nodes": [
+  {
+   "id": "lumen",
+   "name": "หมู่บ้านลูเมน",
+   "type": "village",
+   "risk": "low",
+   "x": 380,
+   "y": 330,
+   "res": "อาหาร พืชผล ข่าวท้องถิ่น"
+  },
+  {
+   "id": "astra",
+   "name": "เมืองอัสเทรา",
+   "type": "town",
+   "risk": "low",
+   "x": 200,
+   "y": 160,
+   "res": "อุปกรณ์ ภารกิจ การรักษา"
+  },
+  {
+   "id": "forest",
+   "name": "ป่ารากเงิน",
+   "type": "wild",
+   "risk": "mid",
+   "x": 660,
+   "y": 170,
+   "res": "สมุนไพร หนังสัตว์"
+  },
+  {
+   "id": "mine",
+   "name": "เหมืองร้าง",
+   "type": "wild",
+   "risk": "midhigh",
+   "x": 270,
+   "y": 490,
+   "res": "แร่ โบราณวัตถุ"
+  },
+  {
+   "id": "tower",
+   "name": "หอคอยจันทรา",
+   "type": "dungeon",
+   "risk": "high",
+   "x": 800,
+   "y": 450,
+   "res": "บอส ของรางวัล เบาะแสโลก"
+  }
+ ],
+ "routes": [
+  {
+   "id": "r1",
+   "a": "lumen",
+   "b": "astra",
+   "days": 1,
+   "danger": "safe",
+   "note": ""
+  },
+  {
+   "id": "r2",
+   "a": "lumen",
+   "b": "forest",
+   "days": 1,
+   "danger": "danger",
+   "note": "รอยฝูงหมาป่า (ข่าวลือ)"
+  },
+  {
+   "id": "r3",
+   "a": "lumen",
+   "b": "forest",
+   "days": 1.5,
+   "danger": "watch",
+   "note": "ทางใต้ อ้อมแต่ปลอดภัยกว่า"
+  },
+  {
+   "id": "r4",
+   "a": "lumen",
+   "b": "mine",
+   "days": 1,
+   "danger": "watch",
+   "note": ""
+  },
+  {
+   "id": "r5",
+   "a": "forest",
+   "b": "tower",
+   "days": 2,
+   "danger": "danger",
+   "note": ""
+  },
+  {
+   "id": "r6",
+   "a": "mine",
+   "b": "tower",
+   "days": 2,
+   "danger": "watch",
+   "note": ""
+  },
+  {
+   "id": "r7",
+   "a": "astra",
+   "b": "forest",
+   "days": 2,
+   "danger": "safe",
+   "note": ""
+  }
+ ],
+ "npcs": [
+  {
+   "id": "rena",
+   "name": "เรน่า",
+   "role": "นักผจญภัย",
+   "home": "lumen",
+   "color": "#c8743d",
+   "traits": {
+    "bravery": 80,
+    "caution": 30,
+    "generosity": 65,
+    "ambition": 55,
+    "sociability": 60
+   },
+   "skills": {
+    "combat": 45,
+    "gathering": 75,
+    "healing": 20,
+    "crafting": 15,
+    "negotiation": 35
+   },
+   "goalShort": "ส่งสมุนไพรให้มีรา",
+   "goalLong": "เป็นนักผจญภัยที่ปกป้องบ้านเกิด",
+   "rel": [
+    {
+     "to": "toma",
+     "trust": 40,
+     "affinity": 35,
+     "respect": 55,
+     "grievance": 30,
+     "why": "เห็นต่างเรื่องความเสี่ยง"
+    },
+    {
+     "to": "mira",
+     "trust": 70,
+     "affinity": 60,
+     "respect": 70,
+     "grievance": 0,
+     "why": "มีราเคยรักษาแผลให้"
+    }
+   ]
+  },
+  {
+   "id": "toma",
+   "name": "โทมะ",
+   "role": "นักธนู",
+   "home": "lumen",
+   "color": "#5a6fc4",
+   "traits": {
+    "bravery": 40,
+    "caution": 80,
+    "generosity": 45,
+    "ambition": 35,
+    "sociability": 40
+   },
+   "skills": {
+    "combat": 60,
+    "gathering": 40,
+    "healing": 10,
+    "crafting": 30,
+    "negotiation": 25
+   },
+   "goalShort": "ไม่ให้ใครในปาร์ตี้บาดเจ็บ",
+   "goalLong": "เก็บเงินซื้อธนูดีสักคัน",
+   "rel": [
+    {
+     "to": "rena",
+     "trust": 45,
+     "affinity": 40,
+     "respect": 60,
+     "grievance": 25,
+     "why": "เรน่าชอบรีบตัดสินใจ"
+    }
+   ]
+  },
+  {
+   "id": "mira",
+   "name": "มีรา",
+   "role": "ผู้รักษา",
+   "home": "lumen",
+   "color": "#4f9e86",
+   "traits": {
+    "bravery": 45,
+    "caution": 55,
+    "generosity": 85,
+    "ambition": 30,
+    "sociability": 65
+   },
+   "skills": {
+    "combat": 10,
+    "gathering": 45,
+    "healing": 80,
+    "crafting": 35,
+    "negotiation": 50
+   },
+   "goalShort": "หายาให้ผู้ป่วย 2 คน",
+   "goalLong": "เปิดห้องรักษาที่มียาพอตลอดปี",
+   "rel": [
+    {
+     "to": "rena",
+     "trust": 65,
+     "affinity": 55,
+     "respect": 60,
+     "grievance": 0,
+     "why": "เรน่ารับงานช่วยหมู่บ้านเสมอ"
+    }
+   ]
+  },
+  {
+   "id": "bron",
+   "name": "บรอน",
+   "role": "ช่างตีเหล็ก",
+   "home": "lumen",
+   "color": "#8a5a3f",
+   "traits": {
+    "bravery": 55,
+    "caution": 50,
+    "generosity": 40,
+    "ambition": 60,
+    "sociability": 70
+   },
+   "skills": {
+    "combat": 35,
+    "gathering": 20,
+    "healing": 5,
+    "crafting": 80,
+    "negotiation": 45
+   },
+   "goalShort": "ซ่อมดาบให้กองรักษาการณ์",
+   "goalLong": "รับลูกศิษย์สืบทอดร้าน",
+   "rel": []
+  },
+  {
+   "id": "darin",
+   "name": "ดาริน",
+   "role": "พ่อค้า",
+   "home": "lumen",
+   "color": "#9c4f7a",
+   "traits": {
+    "bravery": 35,
+    "caution": 65,
+    "generosity": 35,
+    "ambition": 75,
+    "sociability": 80
+   },
+   "skills": {
+    "combat": 15,
+    "gathering": 20,
+    "healing": 5,
+    "crafting": 20,
+    "negotiation": 75
+   },
+   "goalShort": "ขายเสบียงให้ปาร์ตี้",
+   "goalLong": "เปิดเส้นทางค้ากับอัสเทรา",
+   "rel": []
+  },
+  {
+   "id": "harl",
+   "name": "ฮาร์ล",
+   "role": "ชาวนา",
+   "home": "lumen",
+   "color": "#7d8a3c",
+   "traits": {
+    "bravery": 40,
+    "caution": 60,
+    "generosity": 55,
+    "ambition": 25,
+    "sociability": 50
+   },
+   "skills": {
+    "combat": 15,
+    "gathering": 60,
+    "healing": 10,
+    "crafting": 30,
+    "negotiation": 25
+   },
+   "goalShort": "เก็บเกี่ยวก่อนฝนหนัก",
+   "goalLong": "เลี้ยงครอบครัวให้พ้นหน้าแล้ง",
+   "rel": []
+  },
+  {
+   "id": "nella",
+   "name": "เนลลา",
+   "role": "ชาวนา",
+   "home": "lumen",
+   "color": "#b08a3a",
+   "traits": {
+    "bravery": 50,
+    "caution": 45,
+    "generosity": 60,
+    "ambition": 35,
+    "sociability": 55
+   },
+   "skills": {
+    "combat": 20,
+    "gathering": 65,
+    "healing": 15,
+    "crafting": 25,
+    "negotiation": 30
+   },
+   "goalShort": "ขายผลผลิตส่วนเกิน",
+   "goalLong": "ซื้อที่ดินเพิ่ม",
+   "rel": []
+  },
+  {
+   "id": "kel",
+   "name": "เคล",
+   "role": "ยามรักษาการณ์",
+   "home": "lumen",
+   "color": "#4a5a6e",
+   "traits": {
+    "bravery": 70,
+    "caution": 55,
+    "generosity": 50,
+    "ambition": 40,
+    "sociability": 35
+   },
+   "skills": {
+    "combat": 55,
+    "gathering": 15,
+    "healing": 10,
+    "crafting": 15,
+    "negotiation": 30
+   },
+   "goalShort": "เวรกะดึกให้ครบ",
+   "goalLong": "เป็นหัวหน้ากองรักษาการณ์",
+   "rel": []
+  }
+ ],
+ "monsters": [
+  {
+   "id": "shadow_wolf",
+   "name": "หมาป่าเงา",
+   "kind": "pack",
+   "habitat": "forest",
+   "threat": 18,
+   "gmin": 3,
+   "gmax": 6,
+   "behavior": "ล่าเป็นฝูง กลัวไฟ",
+   "drops": "หนังสัตว์ เขี้ยว"
+  },
+  {
+   "id": "bog_slug",
+   "name": "ทากพิษ",
+   "kind": "common",
+   "habitat": "forest",
+   "threat": 8,
+   "gmin": 1,
+   "gmax": 2,
+   "behavior": "ช้า พ่นพิษเมื่อถูกโจมตี",
+   "drops": "เมือกพิษ (วัตถุดิบยา)"
+  },
+  {
+   "id": "rock_bat",
+   "name": "ค้างคาวหิน",
+   "kind": "pack",
+   "habitat": "mine",
+   "threat": 10,
+   "gmin": 5,
+   "gmax": 10,
+   "behavior": "รุมจากเพดานถ้ำ",
+   "drops": "ปีกหิน"
+  },
+  {
+   "id": "moon_warden",
+   "name": "ผู้เฝ้าจันทรา",
+   "kind": "boss",
+   "habitat": "tower",
+   "threat": 120,
+   "gmin": 1,
+   "gmax": 1,
+   "behavior": "พลังแรงขึ้นในคืนจันทร์เต็มดวง",
+   "drops": "เศษผลึกจันทรา"
+  }
+ ],
+ "goods": [
+  {
+   "id": "food",
+   "name": "อาหาร",
+   "cat": "อาหารพื้นฐาน",
+   "base": 4,
+   "shelf": 7,
+   "daily": 12,
+   "sub": ""
+  },
+  {
+   "id": "medicine",
+   "name": "ยาพื้นฐาน",
+   "cat": "สมุนไพร/ยา",
+   "base": 12,
+   "shelf": 30,
+   "daily": 3,
+   "sub": "moonleaf"
+  },
+  {
+   "id": "moonleaf",
+   "name": "ใบจันทร์ขาว",
+   "cat": "วัตถุดิบเก็บเกี่ยว",
+   "base": 5,
+   "shelf": 10,
+   "daily": 1,
+   "sub": ""
+  },
+  {
+   "id": "materials",
+   "name": "วัตถุดิบทั่วไป",
+   "cat": "วัตถุดิบเก็บเกี่ยว",
+   "base": 6,
+   "shelf": 120,
+   "daily": 2,
+   "sub": ""
+  },
+  {
+   "id": "equipment",
+   "name": "อุปกรณ์",
+   "cat": "อุปกรณ์",
+   "base": 30,
+   "shelf": 365,
+   "daily": 0.3,
+   "sub": ""
+  }
+ ],
+ "quests": [
+  {
+   "id": "gather",
+   "name": "เก็บทรัพยากร/สมุนไพร",
+   "trigger": "สต็อกยาของชุมชนต่ำกว่า 50% ของเป้าหมาย",
+   "issuer": "ผู้รักษา",
+   "dest": "forest",
+   "threat": "mid",
+   "reward": "เงิน 20 + ความเคารพจากผู้มอบ",
+   "success": "ส่งวัตถุดิบครบตามจำนวน",
+   "fail": "หมดเวลา หรือปาร์ตี้ถอยกลับมือเปล่า",
+   "effect": "สต็อกยาเพิ่ม ขวัญกำลังใจชุมชนดีขึ้น"
+  },
+  {
+   "id": "slay",
+   "name": "กำจัด/ขับไล่มอนสเตอร์",
+   "trigger": "ภัยบนเส้นทางสูงกว่า 60",
+   "issuer": "ยามรักษาการณ์",
+   "dest": "forest",
+   "threat": "high",
+   "reward": "เงิน 35 จากคลังเมือง",
+   "success": "ภัยเส้นทางลดลงต่ำกว่า 40",
+   "fail": "ปาร์ตี้ถอยหรือบาดเจ็บหนัก",
+   "effect": "การค้าค่อย ๆ ฟื้น"
+  },
+  {
+   "id": "escort",
+   "name": "คุ้มกันผู้เดินทาง/สินค้า",
+   "trigger": "พ่อค้าต้องเดินทางผ่านเส้นทางเสี่ยง",
+   "issuer": "พ่อค้า",
+   "dest": "astra",
+   "threat": "mid",
+   "reward": "ส่วนแบ่งกำไร 15%",
+   "success": "ขบวนถึงปลายทาง",
+   "fail": "สินค้าถูกปล้นหรือเสียหาย",
+   "effect": "ราคาสินค้าในหมู่บ้านลดลง"
+  },
+  {
+   "id": "explore",
+   "name": "สำรวจพื้นที่",
+   "trigger": "มีข่าวลือใหม่เกี่ยวกับสถานที่",
+   "issuer": "ยามรักษาการณ์",
+   "dest": "mine",
+   "threat": "mid",
+   "reward": "เงิน 15 + ข้อมูลพื้นที่",
+   "success": "กลับมาพร้อมข้อมูล",
+   "fail": "หลงทางหรือถอย",
+   "effect": "เปิดเผยภัย/ทรัพยากรของพื้นที่"
+  },
+  {
+   "id": "deliver",
+   "name": "ส่งข่าวหรือสิ่งของ",
+   "trigger": "ชุมชนต้องการติดต่ออีกชุมชน",
+   "issuer": "พ่อค้า",
+   "dest": "astra",
+   "threat": "low",
+   "reward": "เงิน 8",
+   "success": "ส่งถึงมือผู้รับ",
+   "fail": "ของหายระหว่างทาง",
+   "effect": "ความสัมพันธ์ระหว่างชุมชนดีขึ้น"
+  }
+ ],
+ "crisis": {
+  "name": "สมุนไพรขาดแคลน",
+  "region": "lumen",
+  "phases": [
+   {
+    "name": "ข่าวลือ",
+    "text": "มีราบ่นว่าสมุนไพรในห้องรักษาเหลือน้อย",
+    "trigger": "ยา < 60% ของเป้าหมาย"
+   },
+   {
+    "name": "ผลกระทบเฉพาะจุด",
+    "text": "ผู้ป่วยต้องรอคิว ราคายาขึ้น",
+    "trigger": "ยา < 40%"
+   },
+   {
+    "name": "ผลกระทบวงกว้าง",
+    "text": "คนงานป่วยหยุดงาน ผลผลิตลด",
+    "trigger": "ยา < 25% นาน 3 วัน"
+   },
+   {
+    "name": "จุดแตกหัก",
+    "text": "ต้องเลือกปันส่วนยา หรือส่งคนไปซื้อที่อัสเทรา",
+    "trigger": "ยา < 10%"
+   },
+   {
+    "name": "ผลลัพธ์",
+    "text": "สถานะใหม่ตามผลที่เกิด",
+    "trigger": "ครบ 14 วัน หรือยากลับ ≥ 60%"
+   }
+  ],
+  "outcomes": [
+   {
+    "name": "ยับยั้งได้",
+    "cond": "ยากลับ ≥ 60% ภายใน 7 วัน",
+    "effect": "ขวัญกำลังใจ +10 · มีราเคารพผู้ช่วย"
+   },
+   {
+    "name": "ประคองได้",
+    "cond": "ยาไม่ต่ำกว่า 10% ตลอดวิกฤต",
+    "effect": "ราคายาสูงต่อ 1 สัปดาห์"
+   },
+   {
+    "name": "ล้มเหลวบางส่วน",
+    "cond": "ยาเคยหมด",
+    "effect": "ผู้ป่วยอาการหนัก · ครัวเรือนบางส่วนย้ายไปอัสเทรา"
+   }
+  ]
+ },
+ "templates": [
+  {
+   "id": "party_returned",
+   "event": "party_returned",
+   "text": "{party_leader}พาปาร์ตี้กลับจาก{place}พร้อม{item} {amount} หน่วย{injured_note}"
+  },
+  {
+   "id": "npc_injured",
+   "event": "npc_injured",
+   "text": "{npc}ได้รับบาดเจ็บ{severity}ระหว่าง{activity}"
+  },
+  {
+   "id": "shortage_changed",
+   "event": "shortage_changed",
+   "text": "คลัง{good}ของ{place}เปลี่ยนจาก \"{from}\" เป็น \"{to}\""
+  },
+  {
+   "id": "quest_posted",
+   "event": "quest_posted",
+   "text": "{issuer}ขอให้หา{item} {amount} หน่วยจาก{place}"
+  },
+  {
+   "id": "omen_sent",
+   "event": "omen_sent",
+   "text": "กลุ่มดาวส่งลางเตือน{party_leader}ว่า{clue}"
+  }
+ ]
+}

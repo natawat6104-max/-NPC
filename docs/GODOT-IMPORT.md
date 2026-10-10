@@ -1,6 +1,6 @@
 # นำร่างพื้นฐานเข้า Godot 4
 
-ร่างที่ใช้ในเกม: **[`assets/models/char10-npc.glb`](../assets/models/char10-npc.glb)** (0.7 MB, 12,000 สามเหลี่ยม, วัสดุ `Skin` `Shirt` `Pants` `Footwear`, texture ผิว 1024px ชิ้นเดียว) — ทำจากต้นฉบับ [`Meshy_AI_Character_output_10.glb`](../assets/models/Meshy_AI_Character_output_10.glb) (Meshy SmartRig, กระดูก 69 ชิ้น มีนิ้วครบ, สูง 1.7 เมตร, หันหน้า +Z) ด้วย `tools/models/make_npc_body.py` — ดู D15/D16 ใน [`DECISIONS.md`](DECISIONS.md)
+ร่างที่ใช้ในเกม: **[`assets/models/char10-npc.glb`](../assets/models/char10-npc.glb)** (0.7 MB, 12,000 สามเหลี่ยม, วัสดุ `Skin` `Shirt` `Pants` `Footwear`, texture ผิว 1024px ชิ้นเดียว) — ทำจากต้นฉบับ [`Meshy_AI_Character_output_10.glb`](../assets/models/source/Meshy_AI_Character_output_10.glb) (Meshy SmartRig, กระดูก 69 ชิ้น มีนิ้วครบ, สูง 1.7 เมตร, หันหน้า +Z) ด้วย `tools/models/make_npc_body.py` — ดู D15/D16 ใน [`DECISIONS.md`](DECISIONS.md)
 
 - เปลี่ยนสีชุด: ตั้ง `albedo_color` ของวัสดุ `Shirt` (สีหลัก) `Pants` (สีรอง) ต่อ NPC (ใช้ `material_override` หรือ `set_surface_override_material` กับสำเนาของวัสดุ) — `Skin` มี texture ที่ปรับให้สว่าง สีผิวมาจาก `albedo_color` เช่นกัน
 - ข้อ 1 และ 3 ด้านล่างใช้กับต้นฉบับเท่านั้น `char10-npc.glb` ย่อ texture และลดสามเหลี่ยมแล้ว

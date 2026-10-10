@@ -1,5 +1,5 @@
 {
-  "model": "assets/models/Meshy_AI_Character_output_10.glb",
+  "model": "assets/models/source/Meshy_AI_Character_output_10.glb",
   "profile": "SkeletonProfileHumanoid",
   "bone_map": {
     "Hips": "Bone_000",

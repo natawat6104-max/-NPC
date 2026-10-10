@@ -29,15 +29,17 @@
 | `docs/BALANCE.md`, `data/balance.json`, `tools/gen_balance_doc.py` | ตัวเลขกลางของเกม |
 | `docs/mockups/star-watcher-3d.html` | ต้นแบบมุมมองกลุ่มดาว 3D (อวกาศ → ภูมิภาค → หมู่บ้าน) |
 | `docs/mockups/star-studio.html` | **Star Studio** — editor เนื้อหาเกม (ดูหัวข้อถัดไป) |
-| `assets/models/Meshy_AI_Character_output_10.glb` | **ร่างพื้นฐานของ NPC ทุกตัว** (D15) Meshy SmartRig กระดูก 69 ชิ้น `Bone_000…Bone_068` มีนิ้วครบ สูง 1.7 m หันหน้า +Z, 132k สามเหลี่ยม, texture 4096 |
+| `assets/models/source/Meshy_AI_Character_output_10.glb` | **ร่างพื้นฐานของ NPC ทุกตัว** (D15) Meshy SmartRig กระดูก 69 ชิ้น `Bone_000…Bone_068` มีนิ้วครบ สูง 1.7 m หันหน้า +Z, 132k สามเหลี่ยม, texture 4096 |
 | `assets/models/Meshy_AI_Character_output_10.bonemap.json` | จับคู่กระดูกกับ `SkeletonProfileHumanoid` ของ Godot (ตรวจแล้ว ครบ 52 ตำแหน่ง) |
 | `assets/models/char10-npc.glb` | **ร่าง NPC ในเกม** (D16) 12,000 สามเหลี่ยม วัสดุ Skin/Shirt/Pants/Footwear — สร้างด้วย `tools/models/make_npc_body.py` (Blender headless) สำเนาที่ `docs/mockups/models/char10-npc.glb` ให้ Studio โหลด |
 | `docs/mockups/models/char10-base.glb` | ร่างพื้นฐานฉบับย่อ texture 1024/1024/512 (ยังไม่ลดสามเหลี่ยม เลิกใช้ใน Studio แล้ว) |
 | `docs/GODOT-IMPORT.md` | วิธีนำร่างและท่าทางเข้า Godot (ขนาด texture, bone map, AnimationLibrary) — ส่วนท่าทางทดสอบกับ Godot 4.7.2 แล้ว |
 | `assets/animations/` | **ท่าทาง 425 ท่า** (.glb มีแค่กระดูก + ท่า, 34.6 MB) แบ่ง `general/ work/ guard/ combat/ other/` + `index.json` + `README.md` (ภาษาไทย) + BoneMap ของ Godot ใน `godot/` |
 | `tools/animations/` | สคริปต์แปลงท่าจาก Downloads ด้วย Blender (รันซ้ำได้ ดู README ในโฟลเดอร์) |
+| `project.godot`, `sim/`, `game/`, `tests/` | **โปรเจกต์ Godot** (D17): แกนจำลอง GDScript ที่ให้ผลตรงกับ Studio ทุกบรรทัด + หน้าจอข้อความ + ทดสอบ headless |
+| `data/world.json` | เนื้อหาโลกเริ่มต้น (ส่งออกจาก Studio) ที่เกมอ่าน |
 | `tools/godot/make_anim_imports.py` | สร้างไฟล์ `.import` ให้ท่าทั้งหมดใน Godot (AnimationLibrary + BoneMap + loop) |
-| `assets/models/Meshy_AI_fantasy_teen_bald_…fbx` | ร่างตัวแรก เลิกใช้แล้ว |
+| `assets/models/source/Meshy_AI_fantasy_teen_bald_…fbx` | ร่างตัวแรก เลิกใช้แล้ว |
 
 ## Star Studio (`docs/mockups/star-studio.html`)
 - ไฟล์ HTML เดียว ใช้ three.js r128 จาก CDN (cdnjs + jsdelivr: GLTFLoader, FBXLoader, fflate, SkeletonUtils) — ต้องเปิดผ่านเว็บเซิร์ฟเวอร์**ที่โฟลเดอร์หลักของ repo** (`python -m http.server` แล้วเปิด `http://localhost:8000/docs/mockups/star-studio.html`) เพราะท่าทางโหลดจาก `../../assets/animations/` ถ้าเปิดเป็นไฟล์ตรง ๆ จะโหลดโมเดลตัวอย่างและท่าไม่ได้
@@ -53,7 +55,7 @@
 ทำเสร็จแล้ว (2026-10-10): ~~ท่าทางใน Downloads~~ → `assets/animations/` · ~~ใส่ท่าจริงใน Star Studio~~ · ~~คู่มือ Godot ส่วนท่าทาง~~ · ~~ร่าง NPC 12k + แยกสีชุด (D16)~~
 
 1. **ท่าที่ยังขาด** — ตอกค้อน/ตีเหล็ก, นั่งเก้าอี้, นั่งพื้น, นอน, กิน/ดื่ม, ถือตะเกียง, โบกมือ, สวดภาวนา (ตอนนี้ใช้ท่าฟันขวานลงแทนตีเหล็ก และคุกเข่าแทนนั่ง) — ถ้าผู้ใช้โหลดจาก Mixamo มาเพิ่ม: เพิ่มใน `LOOSE`/`PACKS` ของ `tools/animations/mkjobs.py` แล้วรันสคริปต์ตาม `tools/animations/README.md`
-2. **เริ่มโปรเจกต์ Godot** — ยังไม่ได้ตัดสิน (D4): เวอร์ชัน (เครื่องผู้ใช้มี Godot 4.7.2), GDScript หรือ C#, โครงสร้างโฟลเดอร์, เริ่มจากระบบจำลอง (D10) หรือจากภาพ — **คุยกับผู้ใช้ก่อน** ผู้ใช้เคยบอกว่า "เดี๋ยวคุยก่อน"
+2. **ต่อยอดโปรเจกต์ Godot** (เริ่มแล้ว D17 — ดู README หลัก) — ตอนนี้แกนจำลองเป็นแบบรายวัน ย้ายจาก `simulate()` ของ Studio ตรงตัว ขั้นต่อไป: แบ่งวันเป็น 4 ช่วงตาม `time.periods_per_day`, ให้ NPC ทุกคนมีความต้องการ/กิจวัตร (Utility AI + Behavior Tree ตามภาคผนวก AI), ความทรงจำ/ความสัมพันธ์, รัน 30 วันแล้วอ่านพงศาวดาร (D10) — ถ้าเปลี่ยนกติกาจนผลต่างจาก Studio ให้สร้าง `tests/golden/studio_sim.json` ใหม่หรือปรับ Studio ให้ตรงกัน
 3. ฉบับเผยแพร่ของ Star Studio บน claude.ai ยังไม่มีท่าจริง (artifact เสิร์ฟ .glb ไม่ได้ ต้องแปลงเป็น base64 แบบ `char10-base.glb.b64.txt`) — ทำเมื่อผู้ใช้ขอ
 4. เรื่องที่ยังไม่ตัดสินอื่น ๆ อยู่ท้าย `DECISIONS.md`
 
